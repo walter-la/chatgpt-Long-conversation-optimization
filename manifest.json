@@ -16,6 +16,7 @@
       ],
       "js": [
         "core/state.js",
+        "core/i18n.js",
         "utils/storage.js",
         "utils/dom.js",
         "ui/theme.js",

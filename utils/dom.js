@@ -155,8 +155,42 @@ const updateStatus = (message, tone = "info") => {
   if (!status) {
     return;
   }
+  delete status.dataset.i18nKey;
+  delete status.dataset.i18nParams;
   status.textContent = message;
   status.dataset.tone = tone;
+};
+
+const updateStatusByKey = (key, tone = "info", params = {}) => {
+  const status = document.getElementById(STATUS_ID);
+  if (!status) {
+    return;
+  }
+  status.dataset.i18nKey = key;
+  status.dataset.i18nParams = JSON.stringify(params);
+  status.textContent = t(key, params);
+  status.dataset.tone = tone;
+};
+
+const refreshStatusLocalization = () => {
+  const status = document.getElementById(STATUS_ID);
+  if (!status) {
+    return;
+  }
+
+  const key = status.dataset.i18nKey;
+  if (!key) {
+    return;
+  }
+
+  let params = {};
+  try {
+    params = status.dataset.i18nParams ? JSON.parse(status.dataset.i18nParams) : {};
+  } catch (error) {
+    params = {};
+  }
+
+  status.textContent = t(key, params);
 };
 
 const createRafDragController = (applyPosition) => {

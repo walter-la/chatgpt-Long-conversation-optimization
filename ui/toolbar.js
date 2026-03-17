@@ -64,47 +64,177 @@ const ensureButtonVisible = (button) => {
   }
 };
 
+const getToolbarLanguageOptionsMarkup = () => {
+  const selectedPreference = getLanguagePreference();
+  const options = [
+    {
+      value: TOOLKIT_LANGUAGE_AUTO,
+      label: getLanguageMenuLabel(TOOLKIT_LANGUAGE_AUTO),
+    },
+    {
+      value: "en",
+      label: t("language.english"),
+    },
+    {
+      value: "zh-CN",
+      label: t("language.chinese"),
+    },
+  ];
+
+  return options
+    .map(
+      (option) =>
+        `<option value="${option.value}"${option.value === selectedPreference ? " selected" : ""}>${option.label}</option>`,
+    )
+    .join("");
+};
+
+const refreshMinimizedButtonLocalization = () => {
+  const button = document.getElementById(MINIMIZED_ID);
+  if (!(button instanceof HTMLButtonElement)) {
+    return;
+  }
+  button.setAttribute("aria-label", t("toolbar.expandAria"));
+};
+
+const refreshToolbarLocalization = () => {
+  const toolbar = document.getElementById(TOOLKIT_ID);
+  if (!(toolbar instanceof HTMLElement)) {
+    refreshMinimizedButtonLocalization();
+    return;
+  }
+
+  const title = toolbar.querySelector(".chatgpt-toolkit-title");
+  if (title instanceof HTMLElement) {
+    title.textContent = t("toolbar.title");
+  }
+
+  const subtitle = toolbar.querySelector(".chatgpt-toolkit-subtitle");
+  if (subtitle instanceof HTMLElement) {
+    subtitle.textContent = t("toolbar.subtitle");
+  }
+
+  const minimizeButton = toolbar.querySelector('[data-action="minimize"]');
+  if (minimizeButton instanceof HTMLButtonElement) {
+    minimizeButton.textContent = t("toolbar.minimize");
+    minimizeButton.setAttribute("aria-label", t("toolbar.minimizeAria"));
+  }
+
+  const languageLabel = toolbar.querySelector(".chatgpt-toolkit-language-label");
+  if (languageLabel instanceof HTMLElement) {
+    languageLabel.textContent = t("language.label");
+  }
+
+  const languageSelect = toolbar.querySelector("#chatgpt-toolkit-language-select");
+  if (languageSelect instanceof HTMLSelectElement) {
+    languageSelect.innerHTML = getToolbarLanguageOptionsMarkup();
+    languageSelect.value = getLanguagePreference();
+    languageSelect.setAttribute("aria-label", t("language.label"));
+  }
+
+  const collapseButton = toolbar.querySelector('[data-action="collapse"]');
+  if (collapseButton instanceof HTMLButtonElement) {
+    collapseButton.textContent = t("toolbar.collapse");
+  }
+
+  const restoreButton = toolbar.querySelector('[data-action="restore"]');
+  if (restoreButton instanceof HTMLButtonElement) {
+    restoreButton.textContent = t("toolbar.restore");
+  }
+
+  const exportButton = toolbar.querySelector('[data-action="export"]');
+  if (exportButton instanceof HTMLButtonElement) {
+    exportButton.textContent = t("toolbar.export");
+  }
+
+  const promptButton = toolbar.querySelector('[data-action="prompt-library"]');
+  if (promptButton instanceof HTMLButtonElement) {
+    promptButton.textContent = t("toolbar.promptLibrary");
+  }
+
+  const searchInput = toolbar.querySelector("#chatgpt-toolkit-search-input");
+  if (searchInput instanceof HTMLInputElement) {
+    searchInput.placeholder = t("toolbar.searchPlaceholder");
+  }
+
+  const searchButton = toolbar.querySelector('[data-action="search"]');
+  if (searchButton instanceof HTMLButtonElement) {
+    searchButton.textContent = t("toolbar.search");
+    searchButton.title = t("toolbar.searchTitle");
+  }
+
+  const prevButton = toolbar.querySelector('[data-action="search-prev"]');
+  if (prevButton instanceof HTMLButtonElement) {
+    prevButton.textContent = t("toolbar.searchPrev");
+    prevButton.title = t("toolbar.searchPrevTitle");
+  }
+
+  const nextButton = toolbar.querySelector('[data-action="search-next"]');
+  if (nextButton instanceof HTMLButtonElement) {
+    nextButton.textContent = t("toolbar.searchNext");
+    nextButton.title = t("toolbar.searchNextTitle");
+  }
+
+  const tip = toolbar.querySelector(".chatgpt-toolkit-tip");
+  if (tip instanceof HTMLElement) {
+    tip.textContent = t("toolbar.tip");
+  }
+
+  refreshStatusLocalization();
+  refreshMinimizedButtonLocalization();
+  updateSearchUI();
+  updateTimelineToggleButton();
+};
+
 const buildToolbar = () => {
   const container = document.createElement("section");
   container.id = TOOLKIT_ID;
   container.innerHTML = `
     <div class="chatgpt-toolkit-header">
-      <strong>ChatGPT 工具</strong>
-      <span class="chatgpt-toolkit-subtitle">长会话 · 搜索 · 导出 · 时间线</span>
-      <button type="button" class="chatgpt-toolkit-minimize" data-action="minimize" aria-label="收起工具">
-        收起
+      <strong class="chatgpt-toolkit-title">${t("toolbar.title")}</strong>
+      <button type="button" class="chatgpt-toolkit-minimize" data-action="minimize" aria-label="${t("toolbar.minimizeAria")}">
+        ${t("toolbar.minimize")}
       </button>
+      <div class="chatgpt-toolkit-header-meta">
+        <span class="chatgpt-toolkit-subtitle">${t("toolbar.subtitle")}</span>
+        <label class="chatgpt-toolkit-language" for="chatgpt-toolkit-language-select">
+          <span class="chatgpt-toolkit-language-label">${t("language.label")}</span>
+          <select id="chatgpt-toolkit-language-select" class="chatgpt-toolkit-language-select" aria-label="${t("language.label")}">
+            ${getToolbarLanguageOptionsMarkup()}
+          </select>
+        </label>
+      </div>
     </div>
     <div class="chatgpt-toolkit-actions">
       <button type="button" class="chatgpt-toolkit-button" data-action="collapse">
-        优化长会话
+        ${t("toolbar.collapse")}
       </button>
       <button type="button" class="chatgpt-toolkit-button" data-action="restore">
-        恢复隐藏消息
+        ${t("toolbar.restore")}
       </button>
       <button type="button" class="chatgpt-toolkit-button primary" data-action="export">
-        一键导出
+        ${t("toolbar.export")}
       </button>
       <button type="button" class="chatgpt-toolkit-button" data-action="prompt-library">
-        Prompt 指令
+        ${t("toolbar.promptLibrary")}
       </button>
       <button type="button" class="chatgpt-toolkit-button" data-action="timeline-toggle">
-        隐藏时间线
+        ${timelineState.visible ? t("toolbar.timelineHide") : t("toolbar.timelineShow")}
       </button>
     </div>
     <div class="chatgpt-toolkit-search">
       <div class="chatgpt-toolkit-search-row">
-        <input type="text" id="chatgpt-toolkit-search-input" class="chatgpt-toolkit-search-input" placeholder="搜索消息内容..." />
-        <button type="button" class="chatgpt-toolkit-search-btn" data-action="search" title="搜索">搜索</button>
+        <input type="text" id="chatgpt-toolkit-search-input" class="chatgpt-toolkit-search-input" placeholder="${t("toolbar.searchPlaceholder")}" />
+        <button type="button" class="chatgpt-toolkit-search-btn" data-action="search" title="${t("toolbar.searchTitle")}">${t("toolbar.search")}</button>
       </div>
       <div class="chatgpt-toolkit-search-nav">
-        <button type="button" id="chatgpt-toolkit-search-prev" class="chatgpt-toolkit-nav-btn" data-action="search-prev" disabled title="上一条">上一条</button>
+        <button type="button" id="chatgpt-toolkit-search-prev" class="chatgpt-toolkit-nav-btn" data-action="search-prev" disabled title="${t("toolbar.searchPrevTitle")}">${t("toolbar.searchPrev")}</button>
         <span id="chatgpt-toolkit-search-result" class="chatgpt-toolkit-search-result"></span>
-        <button type="button" id="chatgpt-toolkit-search-next" class="chatgpt-toolkit-nav-btn" data-action="search-next" disabled title="下一条">下一条</button>
+        <button type="button" id="chatgpt-toolkit-search-next" class="chatgpt-toolkit-nav-btn" data-action="search-next" disabled title="${t("toolbar.searchNextTitle")}">${t("toolbar.searchNext")}</button>
       </div>
     </div>
-    <p id="${STATUS_ID}" class="chatgpt-toolkit-status" data-tone="info">准备就绪。</p>
-    <p class="chatgpt-toolkit-tip">提示：优化会隐藏旧消息，导出时会自动包含隐藏内容。</p>
+    <p id="${STATUS_ID}" class="chatgpt-toolkit-status" data-tone="info">${t("toolbar.ready")}</p>
+    <p class="chatgpt-toolkit-tip">${t("toolbar.tip")}</p>
   `;
 
   container.addEventListener("click", (event) => {
@@ -151,6 +281,14 @@ const buildToolbar = () => {
     }
   });
 
+  container.addEventListener("change", (event) => {
+    const target = event.target;
+    if (!(target instanceof HTMLSelectElement) || target.id !== "chatgpt-toolkit-language-select") {
+      return;
+    }
+    setLanguagePreference(target.value, { persist: true, refresh: true });
+  });
+
   return container;
 };
 
@@ -159,7 +297,7 @@ const buildMinimizedButton = () => {
   button.id = MINIMIZED_ID;
   button.type = "button";
   button.className = "chatgpt-toolkit-minimized";
-  button.setAttribute("aria-label", "展开 ChatGPT 工具");
+  button.setAttribute("aria-label", t("toolbar.expandAria"));
   button.innerHTML = `<span class="chatgpt-toolkit-minimized-mark" aria-hidden="true">GPT</span>`;
   return button;
 };
@@ -420,8 +558,10 @@ const attachToolbar = () => {
   observeThemeOnBodyIfNeeded();
   const toolbar = buildToolbar();
   document.body.appendChild(toolbar);
+  updateStatusByKey("toolbar.ready", "info");
   updateTimelineToggleButton();
   ensureMinimizedButton();
+  refreshToolbarLocalization();
   syncToolkitTheme();
 };
 

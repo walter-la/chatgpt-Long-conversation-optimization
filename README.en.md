@@ -2,7 +2,7 @@
 
 [简体中文](./README.md) | English
 
-A browser extension for `ChatGPT Web` focused on making long conversations easier to work with. It improves day-to-day usability with long-conversation cleanup, full-session export, in-page search, a prompt library, timeline navigation, and sidebar folder management.
+A browser extension for `ChatGPT Web` focused on making long conversations easier to work with. It improves day-to-day usability with long-conversation cleanup, full-session export, in-page search, a prompt library, timeline navigation, sidebar folder management, and multilingual UI support.
 
 Current active maintainer: `bujue3709` (primary / sole active maintainer)
 
@@ -19,6 +19,7 @@ Current active maintainer: `bujue3709` (primary / sole active maintainer)
 - Prompt library: add, delete, search, categorize, sort, import JSON, export JSON, and copy prompts with one click.
 - Timeline navigation: generate timeline nodes from loaded user messages, preview them, jump to them, and move the timeline panel around.
 - Conversation folders: manage chat folders above the native “Your chats” list without replacing native conversation nodes.
+- Multilingual UI: currently supports Chinese and English, auto-detects the browser language, falls back to English when no match is available, and can be changed manually from the toolbar.
 - Theme sync: the toolbar, timeline, prompt modal, and folder UI follow ChatGPT light/dark appearance.
 - Draggable floating UI: the minimized toolbar button and timeline can both be dragged.
 
@@ -62,8 +63,22 @@ Available actions:
 - Open the prompt library
 - Show or hide the timeline
 - Search messages
+- Change language
 
 When collapsed, the toolbar becomes a floating button. The button can be dragged and snaps to the nearest edge when released.
+
+### Language Support
+
+- On startup, the extension checks the user’s browser language and tries to match it against the built-in UI languages.
+- The extension currently ships with:
+  - `English`
+  - `简体中文`
+- If the browser language does not match a supported locale, the UI falls back to `English`.
+- The toolbar header includes a language switcher with:
+  - `Browser default`
+  - `English`
+  - `简体中文`
+- Manual changes apply immediately across the toolbar, timeline, prompt library, folder UI, and status messages, and the preference is saved locally.
 
 ### Long Conversation Cleanup
 
@@ -139,6 +154,7 @@ The extension is split into small modules and loaded in order by `manifest.json`
 ```text
 core/
   state.js
+  i18n.js
 
 features/
   collapse.js
@@ -165,6 +181,8 @@ manifest.json
 
 - [core/state.js](./core/state.js)
   Runtime constants, shared state, and base configuration.
+- [core/i18n.js](./core/i18n.js)
+  UI dictionaries, browser-language detection, language switching, and localized UI refresh.
 - [utils/dom.js](./utils/dom.js)
   DOM helpers, message node detection, and shared drag scheduling.
 - [utils/storage.js](./utils/storage.js)

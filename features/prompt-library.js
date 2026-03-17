@@ -11,7 +11,7 @@ const createPromptId = () => {
 };
 
 const toSafeText = (value) => (typeof value === "string" ? value.trim() : "");
-const normalizeCategory = (value) => toSafeText(value) || "未分类";
+const normalizeCategory = (value) => toSafeText(value) || t("prompt.uncategorized");
 
 const getPromptStorageArea = () => getExtensionStorageArea();
 
@@ -32,7 +32,7 @@ const normalizePromptItem = (raw) => {
   }
 
   const singleLineContent = content.replace(/\s+/g, " ").trim();
-  const title = toSafeText(raw.title) || singleLineContent.slice(0, 24) || "未命名指令";
+  const title = toSafeText(raw.title) || singleLineContent.slice(0, 24) || t("prompt.untitled");
   const category = normalizeCategory(raw.category);
   const createdAt = Number.isFinite(Number(raw.createdAt)) ? Number(raw.createdAt) : Date.now();
   const updatedAt = Number.isFinite(Number(raw.updatedAt)) ? Number(raw.updatedAt) : createdAt;
@@ -128,7 +128,10 @@ const writePromptPayload = async (payload) => {
   }
 };
 
-const compareText = (left, right) => left.localeCompare(right, "zh-CN", { sensitivity: "base" });
+const compareText = (left, right) =>
+  left.localeCompare(right, getCurrentLanguage() === "zh-CN" ? "zh-CN" : "en", {
+    sensitivity: "base",
+  });
 
 const applyPromptFilters = () => {
   const keyword = promptState.searchText.trim().toLowerCase();
@@ -222,6 +225,8 @@ const hidePromptToast = () => {
   }
   toast.classList.remove("is-visible");
   toast.textContent = "";
+  delete toast.dataset.i18nKey;
+  delete toast.dataset.i18nParams;
 };
 
 const showPromptToast = (message, tone = "success") => {
@@ -245,6 +250,40 @@ const showPromptToast = (message, tone = "success") => {
   }, 1600);
 };
 
+const showPromptToastByKey = (key, tone = "success", params = {}) => {
+  const elements = getPromptModalElements();
+  const toast = elements?.toast;
+  if (!(toast instanceof HTMLElement)) {
+    return;
+  }
+
+  toast.dataset.i18nKey = key;
+  toast.dataset.i18nParams = JSON.stringify(params);
+  showPromptToast(t(key, params), tone);
+};
+
+const refreshPromptToastLocalization = () => {
+  const elements = getPromptModalElements();
+  const toast = elements?.toast;
+  if (!(toast instanceof HTMLElement)) {
+    return;
+  }
+
+  const key = toast.dataset.i18nKey;
+  if (!key) {
+    return;
+  }
+
+  let params = {};
+  try {
+    params = toast.dataset.i18nParams ? JSON.parse(toast.dataset.i18nParams) : {};
+  } catch (error) {
+    params = {};
+  }
+
+  toast.textContent = t(key, params);
+};
+
 const renderPromptCategoryOptions = (categorySelect) => {
   if (!(categorySelect instanceof HTMLSelectElement)) {
     return;
@@ -258,7 +297,7 @@ const renderPromptCategoryOptions = (categorySelect) => {
 
   const allOption = document.createElement("option");
   allOption.value = "all";
-  allOption.textContent = "全部分类";
+  allOption.textContent = t("prompt.allCategories");
   categorySelect.appendChild(allOption);
 
   categories.forEach((category) => {
@@ -281,7 +320,7 @@ const formatPromptTime = (timestamp) => {
   if (Number.isNaN(date.getTime())) {
     return "";
   }
-  return date.toLocaleString("zh-CN", {
+  return date.toLocaleString(getCurrentLanguage() === "zh-CN" ? "zh-CN" : "en-US", {
     month: "2-digit",
     day: "2-digit",
     hour: "2-digit",
@@ -323,12 +362,15 @@ const renderPromptList = () => {
 
   if (promptState.filteredItems.length === 0) {
     emptyTip.style.display = "block";
-    countLabel.textContent = `0 / ${promptState.items.length} 条`;
+    countLabel.textContent = t("prompt.count", { visible: 0, total: promptState.items.length });
     return;
   }
 
   emptyTip.style.display = "none";
-  countLabel.textContent = `${promptState.filteredItems.length} / ${promptState.items.length} 条`;
+  countLabel.textContent = t("prompt.count", {
+    visible: promptState.filteredItems.length,
+    total: promptState.items.length,
+  });
 
   const fragment = document.createDocumentFragment();
   promptState.filteredItems.forEach((item) => {
@@ -351,7 +393,7 @@ const renderPromptList = () => {
     deleteBtn.className = "chatgpt-toolkit-prompt-delete";
     deleteBtn.dataset.promptAction = "delete";
     deleteBtn.dataset.promptId = item.id;
-    deleteBtn.textContent = "删除";
+    deleteBtn.textContent = t("prompt.delete");
 
     header.appendChild(title);
     header.appendChild(deleteBtn);
@@ -359,7 +401,9 @@ const renderPromptList = () => {
     const meta = document.createElement("p");
     meta.className = "chatgpt-toolkit-prompt-item-meta";
     const timestamp = formatPromptTime(item.updatedAt);
-    meta.textContent = `${item.category} · ${timestamp} · 单击复制`;
+    meta.textContent = timestamp
+      ? t("prompt.itemMetaWithTime", { category: item.category, time: timestamp })
+      : t("prompt.itemMetaNoTime", { category: item.category });
 
     const content = document.createElement("p");
     content.className = "chatgpt-toolkit-prompt-item-content";
@@ -406,8 +450,8 @@ const copyTextToClipboard = async (text) => {
 const copyPromptById = async (promptId) => {
   const item = promptState.items.find((prompt) => prompt.id === promptId);
   if (!item) {
-    updateStatus("复制失败：未找到对应 Prompt。", "info");
-    showPromptToast("复制失败", "error");
+    updateStatusByKey("status.promptCopyMissing", "info");
+    showPromptToastByKey("prompt.toastCopyFailed", "error");
     return;
   }
 
@@ -416,12 +460,12 @@ const copyPromptById = async (promptId) => {
 
   const copied = await copyTextToClipboard(item.content);
   if (copied) {
-    updateStatus(`已复制 Prompt：${item.title}`, "success");
-    showPromptToast("复制成功", "success");
+    updateStatusByKey("status.promptCopyDone", "success", { title: item.title });
+    showPromptToastByKey("prompt.toastCopyDone", "success");
     return;
   }
-  updateStatus("复制失败：浏览器不允许访问剪贴板。", "info");
-  showPromptToast("复制失败", "error");
+  updateStatusByKey("status.promptCopyBlocked", "info");
+  showPromptToastByKey("prompt.toastCopyFailed", "error");
 };
 
 const addPromptFromModal = async () => {
@@ -441,12 +485,12 @@ const addPromptFromModal = async () => {
 
   const content = toSafeText(addContent.value);
   if (!content) {
-    updateStatus("新增失败：Prompt 内容不能为空。", "info");
+    updateStatusByKey("status.promptAddEmpty", "info");
     return;
   }
 
   const timestamp = Date.now();
-  const title = toSafeText(addTitle.value) || content.replace(/\s+/g, " ").slice(0, 24) || "未命名指令";
+  const title = toSafeText(addTitle.value) || content.replace(/\s+/g, " ").slice(0, 24) || t("prompt.untitled");
   const category = normalizeCategory(addCategory.value);
   const newItem = {
     id: createPromptId(),
@@ -466,7 +510,7 @@ const addPromptFromModal = async () => {
   addCategory.value = "";
   addContent.value = "";
 
-  updateStatus("已新增 Prompt 指令。", "success");
+  updateStatusByKey("status.promptAddDone", "success");
 };
 
 const deletePromptById = async (promptId) => {
@@ -475,14 +519,14 @@ const deletePromptById = async (promptId) => {
     return;
   }
 
-  if (!window.confirm(`确认删除 Prompt「${item.title}」吗？`)) {
+  if (!window.confirm(t("prompt.deleteConfirm", { title: item.title }))) {
     return;
   }
 
   const nextItems = promptState.items.filter((prompt) => prompt.id !== promptId);
   await savePromptItems(nextItems);
   renderPromptList();
-  updateStatus("已删除 Prompt 指令。", "success");
+  updateStatusByKey("status.promptDeleteDone", "success");
 };
 
 const exportPromptLibrary = () => {
@@ -498,7 +542,7 @@ const exportPromptLibrary = () => {
   link.click();
   link.remove();
   setTimeout(() => URL.revokeObjectURL(objectUrl), 1000);
-  updateStatus("Prompt 指令已导出为 JSON。", "success");
+  updateStatusByKey("status.promptExportDone", "success");
 };
 
 const mergeImportedPromptItems = (incomingItems) => {
@@ -539,24 +583,102 @@ const importPromptLibrary = async (fileInput) => {
     const parsed = JSON.parse(content);
     const incomingItems = extractPromptItems(parsed);
     if (incomingItems.length === 0) {
-      updateStatus("导入失败：JSON 文件中没有可用 Prompt。", "info");
+      updateStatusByKey("status.promptImportEmpty", "info");
       return;
     }
 
     const { merged, addedCount } = mergeImportedPromptItems(incomingItems);
     if (addedCount === 0) {
-      updateStatus("导入完成：没有新增内容。", "info");
+      updateStatusByKey("status.promptImportNoNew", "info");
       return;
     }
 
     await savePromptItems(merged);
     renderPromptList();
-    updateStatus(`导入完成：新增 ${addedCount} 条 Prompt。`, "success");
+    updateStatusByKey("status.promptImportDone", "success", { count: addedCount });
   } catch (error) {
-    updateStatus("导入失败：请检查 JSON 格式。", "info");
+    updateStatusByKey("status.promptImportInvalid", "info");
   } finally {
     fileInput.value = "";
   }
+};
+
+const refreshPromptLocalization = () => {
+  const elements = getPromptModalElements();
+  if (!elements) {
+    return;
+  }
+
+  const { modal, searchInput, categorySelect, sortSelect, addTitle, addCategory, addContent } = elements;
+
+  if (modal instanceof HTMLElement) {
+    const panel = modal.querySelector(".chatgpt-toolkit-prompt-panel");
+    if (panel instanceof HTMLElement) {
+      panel.setAttribute("aria-label", t("prompt.modalAria"));
+    }
+
+    const title = modal.querySelector(".chatgpt-toolkit-prompt-header strong");
+    if (title instanceof HTMLElement) {
+      title.textContent = t("prompt.title");
+    }
+
+    const close = modal.querySelector('[data-prompt-action="close"]');
+    if (close instanceof HTMLButtonElement) {
+      close.textContent = t("prompt.close");
+    }
+
+    const empty = modal.querySelector("#chatgpt-toolkit-prompt-empty");
+    if (empty instanceof HTMLElement) {
+      empty.textContent = t("prompt.empty");
+    }
+
+    const add = modal.querySelector('[data-prompt-action="add"]');
+    if (add instanceof HTMLButtonElement) {
+      add.textContent = t("prompt.add");
+    }
+
+    const importButton = modal.querySelector('[data-prompt-action="import"]');
+    if (importButton instanceof HTMLButtonElement) {
+      importButton.textContent = t("prompt.importJson");
+    }
+
+    const exportButton = modal.querySelector('[data-prompt-action="export"]');
+    if (exportButton instanceof HTMLButtonElement) {
+      exportButton.textContent = t("prompt.exportJson");
+    }
+  }
+
+  if (searchInput instanceof HTMLInputElement) {
+    searchInput.placeholder = t("prompt.searchPlaceholder");
+  }
+  if (addTitle instanceof HTMLInputElement) {
+    addTitle.placeholder = t("prompt.titlePlaceholder");
+  }
+  if (addCategory instanceof HTMLInputElement) {
+    addCategory.placeholder = t("prompt.categoryPlaceholder");
+  }
+  if (addContent instanceof HTMLTextAreaElement) {
+    addContent.placeholder = t("prompt.contentPlaceholder");
+  }
+
+  if (sortSelect instanceof HTMLSelectElement) {
+    const currentValue = promptState.sortBy;
+    sortSelect.innerHTML = `
+      <option value="updated-desc">${t("prompt.sortUpdatedDesc")}</option>
+      <option value="updated-asc">${t("prompt.sortUpdatedAsc")}</option>
+      <option value="title-asc">${t("prompt.sortTitleAsc")}</option>
+      <option value="title-desc">${t("prompt.sortTitleDesc")}</option>
+      <option value="category-asc">${t("prompt.sortCategoryAsc")}</option>
+    `;
+    sortSelect.value = currentValue;
+  }
+
+  if (categorySelect instanceof HTMLSelectElement) {
+    renderPromptCategoryOptions(categorySelect);
+  }
+
+  refreshPromptToastLocalization();
+  renderPromptList();
 };
 
 const closePromptModal = () => {
@@ -645,38 +767,38 @@ const ensurePromptModal = () => {
   modal.className = "chatgpt-toolkit-prompt-modal";
   modal.innerHTML = `
     <div class="chatgpt-toolkit-prompt-backdrop" data-prompt-action="close"></div>
-    <div class="chatgpt-toolkit-prompt-panel" role="dialog" aria-modal="true" aria-label="Prompt 指令列表">
+    <div class="chatgpt-toolkit-prompt-panel" role="dialog" aria-modal="true" aria-label="${t("prompt.modalAria")}">
       <div class="chatgpt-toolkit-prompt-header">
-        <strong>Prompt 指令列表</strong>
-        <button type="button" class="chatgpt-toolkit-prompt-close" data-prompt-action="close">关闭</button>
+        <strong>${t("prompt.title")}</strong>
+        <button type="button" class="chatgpt-toolkit-prompt-close" data-prompt-action="close">${t("prompt.close")}</button>
       </div>
       <div id="${PROMPT_TOAST_ID}" class="chatgpt-toolkit-prompt-toast" aria-live="polite"></div>
       <div class="chatgpt-toolkit-prompt-filters">
-        <input id="chatgpt-toolkit-prompt-search" type="text" placeholder="搜索标题/内容/分类" />
+        <input id="chatgpt-toolkit-prompt-search" type="text" placeholder="${t("prompt.searchPlaceholder")}" />
         <select id="chatgpt-toolkit-prompt-category-filter">
-          <option value="all">全部分类</option>
+          <option value="all">${t("prompt.allCategories")}</option>
         </select>
         <select id="chatgpt-toolkit-prompt-sort">
-          <option value="updated-desc">最近更新</option>
-          <option value="updated-asc">最早更新</option>
-          <option value="title-asc">标题 A-Z</option>
-          <option value="title-desc">标题 Z-A</option>
-          <option value="category-asc">分类排序</option>
+          <option value="updated-desc">${t("prompt.sortUpdatedDesc")}</option>
+          <option value="updated-asc">${t("prompt.sortUpdatedAsc")}</option>
+          <option value="title-asc">${t("prompt.sortTitleAsc")}</option>
+          <option value="title-desc">${t("prompt.sortTitleDesc")}</option>
+          <option value="category-asc">${t("prompt.sortCategoryAsc")}</option>
         </select>
       </div>
       <div id="chatgpt-toolkit-prompt-list" class="chatgpt-toolkit-prompt-list"></div>
-      <p id="chatgpt-toolkit-prompt-empty" class="chatgpt-toolkit-prompt-empty">暂无可用 Prompt。</p>
+      <p id="chatgpt-toolkit-prompt-empty" class="chatgpt-toolkit-prompt-empty">${t("prompt.empty")}</p>
       <div class="chatgpt-toolkit-prompt-editor">
-        <input id="chatgpt-toolkit-prompt-add-title" type="text" placeholder="标题（可选）" />
-        <input id="chatgpt-toolkit-prompt-add-category" type="text" placeholder="分类（可选）" />
-        <textarea id="chatgpt-toolkit-prompt-add-content" rows="4" placeholder="输入 Prompt 内容"></textarea>
-        <button type="button" class="chatgpt-toolkit-prompt-add" data-prompt-action="add">添加 Prompt</button>
+        <input id="chatgpt-toolkit-prompt-add-title" type="text" placeholder="${t("prompt.titlePlaceholder")}" />
+        <input id="chatgpt-toolkit-prompt-add-category" type="text" placeholder="${t("prompt.categoryPlaceholder")}" />
+        <textarea id="chatgpt-toolkit-prompt-add-content" rows="4" placeholder="${t("prompt.contentPlaceholder")}"></textarea>
+        <button type="button" class="chatgpt-toolkit-prompt-add" data-prompt-action="add">${t("prompt.add")}</button>
       </div>
       <div class="chatgpt-toolkit-prompt-footer">
-        <span id="chatgpt-toolkit-prompt-count">0 / 0 条</span>
+        <span id="chatgpt-toolkit-prompt-count">${t("prompt.count", { visible: 0, total: 0 })}</span>
         <div class="chatgpt-toolkit-prompt-footer-actions">
-          <button type="button" data-prompt-action="import">导入 JSON</button>
-          <button type="button" data-prompt-action="export">导出 JSON</button>
+          <button type="button" data-prompt-action="import">${t("prompt.importJson")}</button>
+          <button type="button" data-prompt-action="export">${t("prompt.exportJson")}</button>
         </div>
       </div>
       <input id="${PROMPT_FILE_INPUT_ID}" type="file" accept=".json,application/json" />
@@ -756,7 +878,7 @@ const openPromptModal = async () => {
   await ensurePromptLibraryLoaded();
   syncToolkitTheme();
   applyPromptFilters();
-  renderPromptList();
+  refreshPromptLocalization();
 
   promptState.isOpen = true;
   modal.classList.add("is-visible");

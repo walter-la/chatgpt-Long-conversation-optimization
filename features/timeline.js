@@ -418,7 +418,7 @@ const getTimelineItemsFromMessages = () => {
       node,
       timestamp,
       order: index + 1,
-      previewText: previewText || `用户消息 ${index + 1}`,
+      previewText: previewText || t("timeline.previewFallback", { index: index + 1 }),
     });
   });
 
@@ -757,7 +757,7 @@ const handleTimelineWheel = (event) => {
   }
 
   if (timelineState.items.length === 0) {
-    showTimelineHint(state.isCollapsed ? "请恢复隐藏消息" : "已经没有消息了");
+    showTimelineHint(state.isCollapsed ? t("timeline.hintRestore") : t("timeline.hintNoMore"));
     return;
   }
 
@@ -776,7 +776,7 @@ const handleTimelineWheel = (event) => {
   track.scrollTop = nextScrollTop;
 
   if (delta < 0 && previousScrollTop <= 0 && nextScrollTop <= 0) {
-    showTimelineHint(state.isCollapsed ? "请恢复隐藏消息" : "已经没有消息了");
+    showTimelineHint(state.isCollapsed ? t("timeline.hintRestore") : t("timeline.hintNoMore"));
   }
 };
 
@@ -850,7 +850,7 @@ const updateTimelineCount = (currentNodeOrder, totalCount) => {
   const current = Number.isFinite(currentNodeOrder) ? Math.max(0, Math.trunc(currentNodeOrder)) : 0;
   const total = Number.isFinite(totalCount) ? Math.max(0, Math.trunc(totalCount)) : 0;
   count.textContent = `${current}/${total}`;
-  count.setAttribute("aria-label", `当前节点 ${current}，总用户节点 ${total}`);
+  count.setAttribute("aria-label", t("timeline.countAria", { current, total }));
 };
 
 const updateTimelineToggleButton = () => {
@@ -859,12 +859,48 @@ const updateTimelineToggleButton = () => {
     return;
   }
   if (timelineState.visible) {
-    button.textContent = "隐藏时间线";
-    button.setAttribute("aria-label", "隐藏时间线");
+    button.textContent = t("toolbar.timelineHide");
+    button.setAttribute("aria-label", t("toolbar.timelineHide"));
   } else {
-    button.textContent = "显示时间线";
-    button.setAttribute("aria-label", "显示时间线");
+    button.textContent = t("toolbar.timelineShow");
+    button.setAttribute("aria-label", t("toolbar.timelineShow"));
   }
+};
+
+const refreshTimelineLocalization = () => {
+  const timeline = document.getElementById(TIMELINE_ID);
+  if (!(timeline instanceof HTMLElement)) {
+    updateTimelineToggleButton();
+    return;
+  }
+
+  timeline.setAttribute("aria-label", t("timeline.ariaLabel"));
+
+  const title = timeline.querySelector(".chatgpt-toolkit-timeline-title");
+  if (title instanceof HTMLElement) {
+    title.textContent = t("timeline.title");
+  }
+
+  updateTimelineToggleButton();
+
+  const currentItem = timelineState.items[timelineState.activeIndex];
+  updateTimelineCount(currentItem?.order || 0, timelineState.totalUserCount);
+
+  const nodes = timeline.querySelectorAll(".chatgpt-toolkit-timeline-node");
+  nodes.forEach((node) => {
+    if (!(node instanceof HTMLElement)) {
+      return;
+    }
+    const index = Number(node.dataset.timelineIndex);
+    if (Number.isNaN(index)) {
+      return;
+    }
+    const item = timelineState.items[index];
+    node.setAttribute("aria-label", t("timeline.jumpAria", { index: item?.order || index + 1 }));
+  });
+
+  hideTimelinePreview();
+  hideTimelineHint();
 };
 
 const setTimelineVisibility = (visible, options = {}) => {
@@ -912,7 +948,7 @@ const ensureTimeline = () => {
           } else {
             const title = document.createElement("span");
             title.className = "chatgpt-toolkit-timeline-title";
-            title.textContent = "时间线";
+            title.textContent = t("timeline.title");
             header.appendChild(title);
           }
           panel.prepend(header);
@@ -924,6 +960,7 @@ const ensureTimeline = () => {
         header.appendChild(count);
       }
     }
+    existingTimeline.setAttribute("aria-label", t("timeline.ariaLabel"));
     existingTimeline.classList.toggle("is-hidden", !timelineState.visible);
     enableTimelineDrag(existingTimeline);
     updateTimelinePosition();
@@ -940,11 +977,11 @@ const ensureTimeline = () => {
   if (!timelineState.visible) {
     timeline.classList.add("is-hidden");
   }
-  timeline.setAttribute("aria-label", "对话时间线");
+  timeline.setAttribute("aria-label", t("timeline.ariaLabel"));
   timeline.innerHTML = `
     <div class="chatgpt-toolkit-timeline-panel">
       <div class="chatgpt-toolkit-timeline-header">
-        <span class="chatgpt-toolkit-timeline-title">时间线</span>
+        <span class="chatgpt-toolkit-timeline-title">${t("timeline.title")}</span>
         <span id="${TIMELINE_COUNT_ID}" class="chatgpt-toolkit-timeline-count">0/0</span>
       </div>
       <div id="${TIMELINE_TRACK_ID}" class="chatgpt-toolkit-timeline-track">
@@ -1035,7 +1072,7 @@ const renderTimeline = () => {
       nodeButton.type = "button";
       nodeButton.className = "chatgpt-toolkit-timeline-node";
       nodeButton.dataset.timelineIndex = String(index);
-      nodeButton.setAttribute("aria-label", `跳转到第 ${index + 1} 条用户消息`);
+      nodeButton.setAttribute("aria-label", t("timeline.jumpAria", { index: item.order || index + 1 }));
       const topPx = verticalPadding + item.position * usableHeight;
       nodeButton.style.top = `${topPx.toFixed(2)}px`;
       nodeButton.innerHTML = `<span class="chatgpt-toolkit-timeline-dot"></span>`;

@@ -15,7 +15,7 @@ const updateSearchUI = () => {
 
   if (state.searchMatches.length === 0) {
     if (state.searchQuery) {
-      searchResult.textContent = '未找到匹配';
+      searchResult.textContent = t("search.noMatch");
     } else {
       searchResult.textContent = '';
     }
@@ -159,7 +159,7 @@ const performSearch = (query) => {
 
   // 检查是否处于隐藏状态
   if (state.isCollapsed) {
-    updateStatus('请先恢复隐藏消息，才能使用搜索功能。', 'info');
+    updateStatusByKey("status.searchRestoreFirst", "info");
     updateSearchUI();
     return;
   }
@@ -201,7 +201,7 @@ const scrollToCurrentMatch = () => {
 
 const navigateToPrevMatch = () => {
   if (state.isCollapsed) {
-    updateStatus('请先恢复隐藏消息，才能使用搜索功能。', 'info');
+    updateStatusByKey("status.searchRestoreFirst", "info");
     return;
   }
   if (state.searchMatches.length === 0) return;
@@ -214,7 +214,7 @@ const navigateToPrevMatch = () => {
 
 const navigateToNextMatch = () => {
   if (state.isCollapsed) {
-    updateStatus('请先恢复隐藏消息，才能使用搜索功能。', 'info');
+    updateStatusByKey("status.searchRestoreFirst", "info");
     return;
   }
   if (state.searchMatches.length === 0) return;

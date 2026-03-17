@@ -35,7 +35,7 @@ const createFolderId = () => {
 
 const normalizeFolderName = (value, fallbackIndex = 1) => {
   const nextName = typeof value === "string" ? value.trim() : "";
-  return nextName || `新文件夹 ${fallbackIndex}`;
+  return nextName || t("folder.defaultName", { index: fallbackIndex });
 };
 
 const getSortedFolders = () =>
@@ -274,7 +274,7 @@ const isPointInsideRect = (clientX, clientY, rect, padding = 0) => {
 const getFolderById = (folderId) =>
   folderState.folders.find((folder) => folder.id === folderId) || null;
 
-const getNextFolderName = () => `新文件夹 ${folderState.folders.length + 1}`;
+const getNextFolderName = () => t("folder.defaultName", { index: folderState.folders.length + 1 });
 
 const closeFolderMenu = () => {
   const menu = document.getElementById(FOLDER_MENU_ID);
@@ -300,8 +300,8 @@ const ensureFolderMenu = () => {
   menu.className = "chatgpt-toolkit-folder-menu";
   menu.setAttribute(FOLDER_THEME_TARGET_ATTR, "folders");
   menu.innerHTML = `
-    <button type="button" data-folder-menu-action="rename">重命名</button>
-    <button type="button" data-folder-menu-action="delete">删除</button>
+    <button type="button" data-folder-menu-action="rename">${t("folder.menuRename")}</button>
+    <button type="button" data-folder-menu-action="delete">${t("folder.menuDelete")}</button>
   `;
   menu.addEventListener("click", (event) => {
     const target = getSafeEventTarget(event);
@@ -518,7 +518,7 @@ const scheduleSettledFolderRefresh = () => {
 };
 
 const createFolder = () => {
-  const inputName = window.prompt("输入文件夹名称", getNextFolderName());
+  const inputName = window.prompt(t("folder.createPrompt"), getNextFolderName());
   if (inputName === null) {
     return;
   }
@@ -549,7 +549,7 @@ const renameFolder = (folderId) => {
     return;
   }
 
-  const inputName = window.prompt("重命名文件夹", folder.name);
+  const inputName = window.prompt(t("folder.renamePrompt"), folder.name);
   if (inputName === null) {
     return;
   }
@@ -570,7 +570,7 @@ const deleteFolder = (folderId) => {
     return;
   }
 
-  const confirmed = window.confirm(`删除文件夹“${folder.name}”？其中会话会回到未分组。`);
+  const confirmed = window.confirm(t("folder.deleteConfirm", { name: folder.name }));
   if (!confirmed) {
     return;
   }
@@ -728,14 +728,14 @@ const ensureFolderManager = (section, headerButton) => {
     manager.className = "chatgpt-toolkit-folder-manager";
     manager.setAttribute(FOLDER_THEME_TARGET_ATTR, "folders");
     manager.innerHTML = `
-      <div class="chatgpt-toolkit-folder-manager-label">文件夹</div>
+      <div class="chatgpt-toolkit-folder-manager-label">${t("folder.managerLabel")}</div>
       <div class="chatgpt-toolkit-folder-manager-actions">
         <button type="button" class="chatgpt-toolkit-folder-pill" data-folder-action="show-ungrouped">
-          <span>未分组</span>
+          <span>${t("folder.ungrouped")}</span>
           <span class="chatgpt-toolkit-folder-pill-count">0</span>
         </button>
         <button type="button" class="chatgpt-toolkit-folder-pill is-primary" data-folder-action="create">
-          新建
+          ${t("folder.create")}
         </button>
       </div>
     `;
@@ -770,6 +770,52 @@ const ensureFolderManager = (section, headerButton) => {
   }
 
   return manager;
+};
+
+const refreshFolderLocalization = () => {
+  const manager = document.getElementById(FOLDER_MANAGER_ID);
+  if (manager instanceof HTMLElement) {
+    const label = manager.querySelector(".chatgpt-toolkit-folder-manager-label");
+    if (label instanceof HTMLElement) {
+      label.textContent = t("folder.managerLabel");
+    }
+
+    const ungrouped = manager.querySelector('[data-folder-action="show-ungrouped"] > span');
+    if (ungrouped instanceof HTMLElement) {
+      ungrouped.textContent = t("folder.ungrouped");
+    }
+
+    const create = manager.querySelector('[data-folder-action="create"]');
+    if (create instanceof HTMLButtonElement) {
+      create.textContent = t("folder.create");
+    }
+  }
+
+  const menu = document.getElementById(FOLDER_MENU_ID);
+  if (menu instanceof HTMLElement) {
+    const rename = menu.querySelector('[data-folder-menu-action="rename"]');
+    if (rename instanceof HTMLButtonElement) {
+      rename.textContent = t("folder.menuRename");
+    }
+    const del = menu.querySelector('[data-folder-menu-action="delete"]');
+    if (del instanceof HTMLButtonElement) {
+      del.textContent = t("folder.menuDelete");
+    }
+  }
+
+  if (folderState.history instanceof HTMLElement) {
+    folderState.history.querySelectorAll(`.${FOLDER_EMPTY_CLASS}`).forEach((node) => {
+      if (node instanceof HTMLElement) {
+        node.textContent = t("folder.emptyHint");
+      }
+    });
+
+    folderState.history.querySelectorAll("[data-folder-action='open-menu']").forEach((node) => {
+      if (node instanceof HTMLButtonElement) {
+        node.setAttribute("aria-label", t("folder.menuOpenAria"));
+      }
+    });
+  }
 };
 
 const getDropZoneFromTarget = (target) => {
@@ -1187,7 +1233,7 @@ const renderFolders = () => {
           <span class="chatgpt-toolkit-folder-chevron" aria-hidden="true"></span>
           <span class="chatgpt-toolkit-folder-name"></span>
           <span class="chatgpt-toolkit-folder-count"></span>
-          <button type="button" class="chatgpt-toolkit-folder-menu-btn" data-folder-action="open-menu" aria-label="打开文件夹菜单">
+          <button type="button" class="chatgpt-toolkit-folder-menu-btn" data-folder-action="open-menu" aria-label="${t("folder.menuOpenAria")}">
             <span aria-hidden="true">···</span>
           </button>
         `;
@@ -1223,7 +1269,7 @@ const renderFolders = () => {
           emptyState = document.createElement("div");
           emptyState.className = FOLDER_EMPTY_CLASS;
           emptyState.setAttribute(FOLDER_DROPZONE_ATTR, "folder");
-          emptyState.textContent = "拖动聊天到这里";
+          emptyState.textContent = t("folder.emptyHint");
           history.appendChild(emptyState);
         }
 

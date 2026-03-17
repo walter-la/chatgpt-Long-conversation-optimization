@@ -32,5 +32,5 @@ const exportMessages = () => {
   link.remove();
   setTimeout(() => URL.revokeObjectURL(objectUrl), 1000);
 
-  updateStatus("导出已开始，请检查下载文件。", "success");
+  updateStatusByKey("status.exportStarted", "success");
 };

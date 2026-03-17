@@ -1,0 +1,337 @@
+/*
+ * ChatGPT Conversation Toolkit - Internationalization
+ */
+const DEFAULT_TOOLKIT_LANGUAGE = "en";
+const TOOLKIT_LANGUAGE_AUTO = "auto";
+const TOOLKIT_SUPPORTED_LANGUAGES = ["en", "zh-CN"];
+
+const i18nState = {
+  preference: TOOLKIT_LANGUAGE_AUTO,
+  detected: DEFAULT_TOOLKIT_LANGUAGE,
+  locale: DEFAULT_TOOLKIT_LANGUAGE,
+};
+
+const I18N_MESSAGES = {
+  en: {
+    "language.label": "Language",
+    "language.auto": "Browser default",
+    "language.autoWithLocale": "Browser default ({language})",
+    "language.english": "English",
+    "language.chinese": "Chinese (Simplified)",
+
+    "toolbar.title": "ChatGPT Toolkit",
+    "toolbar.subtitle": "Long threads · Search · Export · Timeline",
+    "toolbar.minimize": "Hide",
+    "toolbar.minimizeAria": "Hide toolkit",
+    "toolbar.expandAria": "Open ChatGPT Toolkit",
+    "toolbar.collapse": "Optimize Long Conversation",
+    "toolbar.restore": "Restore Hidden Messages",
+    "toolbar.export": "Export JSON",
+    "toolbar.promptLibrary": "Prompt Library",
+    "toolbar.timelineShow": "Show Timeline",
+    "toolbar.timelineHide": "Hide Timeline",
+    "toolbar.searchPlaceholder": "Search messages...",
+    "toolbar.search": "Search",
+    "toolbar.searchTitle": "Search",
+    "toolbar.searchPrev": "Prev",
+    "toolbar.searchPrevTitle": "Previous match",
+    "toolbar.searchNext": "Next",
+    "toolbar.searchNextTitle": "Next match",
+    "toolbar.ready": "Ready.",
+    "toolbar.tip": "Tip: optimization hides older messages, but export still includes them.",
+
+    "status.collapseNoNeed": "There are not enough messages to optimize.",
+    "status.collapseDone": "Optimized: hid {count} older messages.",
+    "status.restoreNone": "There are no hidden messages to restore.",
+    "status.restoreDone": "All hidden messages have been restored.",
+    "status.exportStarted": "Export started. Check your downloads.",
+    "status.searchRestoreFirst": "Restore hidden messages before using search.",
+    "status.searchNoMatch": "No matches found.",
+    "status.promptCopyMissing": "Copy failed: prompt not found.",
+    "status.promptCopyBlocked": "Copy failed: clipboard access is not available.",
+    "status.promptCopyDone": "Copied prompt: {title}",
+    "status.promptAddEmpty": "Add failed: prompt content cannot be empty.",
+    "status.promptAddDone": "Prompt added.",
+    "status.promptDeleteDone": "Prompt deleted.",
+    "status.promptExportDone": "Prompt library exported as JSON.",
+    "status.promptImportEmpty": "Import failed: the JSON file has no usable prompts.",
+    "status.promptImportNoNew": "Import complete: nothing new was added.",
+    "status.promptImportDone": "Import complete: added {count} prompts.",
+    "status.promptImportInvalid": "Import failed: invalid JSON format.",
+
+    "search.noMatch": "No matches",
+
+    "timeline.title": "Timeline",
+    "timeline.ariaLabel": "Conversation timeline",
+    "timeline.hintNoMore": "No more messages.",
+    "timeline.hintRestore": "Restore hidden messages first.",
+    "timeline.countAria": "Current node {current}, total user messages {total}",
+    "timeline.jumpAria": "Jump to user message {index}",
+    "timeline.previewFallback": "User message {index}",
+
+    "prompt.untitled": "Untitled Prompt",
+    "prompt.uncategorized": "Uncategorized",
+    "prompt.toastCopyDone": "Copied",
+    "prompt.toastCopyFailed": "Copy failed",
+    "prompt.title": "Prompt Library",
+    "prompt.modalAria": "Prompt library",
+    "prompt.close": "Close",
+    "prompt.searchPlaceholder": "Search title / content / category",
+    "prompt.allCategories": "All categories",
+    "prompt.sortUpdatedDesc": "Recently updated",
+    "prompt.sortUpdatedAsc": "Oldest updated",
+    "prompt.sortTitleAsc": "Title A-Z",
+    "prompt.sortTitleDesc": "Title Z-A",
+    "prompt.sortCategoryAsc": "Category",
+    "prompt.empty": "No prompts available yet.",
+    "prompt.titlePlaceholder": "Title (optional)",
+    "prompt.categoryPlaceholder": "Category (optional)",
+    "prompt.contentPlaceholder": "Enter prompt content",
+    "prompt.add": "Add Prompt",
+    "prompt.count": "{visible} / {total}",
+    "prompt.importJson": "Import JSON",
+    "prompt.exportJson": "Export JSON",
+    "prompt.delete": "Delete",
+    "prompt.itemMetaWithTime": "{category} · {time} · Click to copy",
+    "prompt.itemMetaNoTime": "{category} · Click to copy",
+    "prompt.deleteConfirm": "Delete prompt “{title}”?",
+
+    "folder.defaultName": "New Folder {index}",
+    "folder.managerLabel": "Folders",
+    "folder.ungrouped": "Ungrouped",
+    "folder.create": "New",
+    "folder.menuRename": "Rename",
+    "folder.menuDelete": "Delete",
+    "folder.menuOpenAria": "Open folder menu",
+    "folder.emptyHint": "Drop conversations here",
+    "folder.createPrompt": "Enter a folder name",
+    "folder.renamePrompt": "Rename folder",
+    "folder.deleteConfirm": "Delete folder “{name}”? Conversations inside it will move back to Ungrouped.",
+  },
+  "zh-CN": {
+    "language.label": "语言",
+    "language.auto": "跟随浏览器",
+    "language.autoWithLocale": "跟随浏览器（{language}）",
+    "language.english": "English",
+    "language.chinese": "简体中文",
+
+    "toolbar.title": "ChatGPT 工具",
+    "toolbar.subtitle": "长会话 · 搜索 · 导出 · 时间线",
+    "toolbar.minimize": "收起",
+    "toolbar.minimizeAria": "收起工具",
+    "toolbar.expandAria": "展开 ChatGPT 工具",
+    "toolbar.collapse": "优化长会话",
+    "toolbar.restore": "恢复隐藏消息",
+    "toolbar.export": "一键导出",
+    "toolbar.promptLibrary": "Prompt 指令",
+    "toolbar.timelineShow": "显示时间线",
+    "toolbar.timelineHide": "隐藏时间线",
+    "toolbar.searchPlaceholder": "搜索消息内容...",
+    "toolbar.search": "搜索",
+    "toolbar.searchTitle": "搜索",
+    "toolbar.searchPrev": "上一条",
+    "toolbar.searchPrevTitle": "上一条",
+    "toolbar.searchNext": "下一条",
+    "toolbar.searchNextTitle": "下一条",
+    "toolbar.ready": "准备就绪。",
+    "toolbar.tip": "提示：优化会隐藏旧消息，导出时会自动包含隐藏内容。",
+
+    "status.collapseNoNeed": "当前消息数量较少，无需优化。",
+    "status.collapseDone": "已优化：隐藏 {count} 条旧消息。",
+    "status.restoreNone": "没有需要恢复的消息。",
+    "status.restoreDone": "已恢复所有消息。",
+    "status.exportStarted": "导出已开始，请检查下载文件。",
+    "status.searchRestoreFirst": "请先恢复隐藏消息，才能使用搜索功能。",
+    "status.searchNoMatch": "未找到匹配。",
+    "status.promptCopyMissing": "复制失败：未找到对应 Prompt。",
+    "status.promptCopyBlocked": "复制失败：浏览器不允许访问剪贴板。",
+    "status.promptCopyDone": "已复制 Prompt：{title}",
+    "status.promptAddEmpty": "新增失败：Prompt 内容不能为空。",
+    "status.promptAddDone": "已新增 Prompt 指令。",
+    "status.promptDeleteDone": "已删除 Prompt 指令。",
+    "status.promptExportDone": "Prompt 指令已导出为 JSON。",
+    "status.promptImportEmpty": "导入失败：JSON 文件中没有可用 Prompt。",
+    "status.promptImportNoNew": "导入完成：没有新增内容。",
+    "status.promptImportDone": "导入完成：新增 {count} 条 Prompt。",
+    "status.promptImportInvalid": "导入失败：请检查 JSON 格式。",
+
+    "search.noMatch": "未找到匹配",
+
+    "timeline.title": "时间线",
+    "timeline.ariaLabel": "对话时间线",
+    "timeline.hintNoMore": "已经没有消息了",
+    "timeline.hintRestore": "请恢复隐藏消息",
+    "timeline.countAria": "当前节点 {current}，总用户节点 {total}",
+    "timeline.jumpAria": "跳转到第 {index} 条用户消息",
+    "timeline.previewFallback": "用户消息 {index}",
+
+    "prompt.untitled": "未命名指令",
+    "prompt.uncategorized": "未分类",
+    "prompt.toastCopyDone": "复制成功",
+    "prompt.toastCopyFailed": "复制失败",
+    "prompt.title": "Prompt 指令列表",
+    "prompt.modalAria": "Prompt 指令列表",
+    "prompt.close": "关闭",
+    "prompt.searchPlaceholder": "搜索标题/内容/分类",
+    "prompt.allCategories": "全部分类",
+    "prompt.sortUpdatedDesc": "最近更新",
+    "prompt.sortUpdatedAsc": "最早更新",
+    "prompt.sortTitleAsc": "标题 A-Z",
+    "prompt.sortTitleDesc": "标题 Z-A",
+    "prompt.sortCategoryAsc": "分类排序",
+    "prompt.empty": "暂无可用 Prompt。",
+    "prompt.titlePlaceholder": "标题（可选）",
+    "prompt.categoryPlaceholder": "分类（可选）",
+    "prompt.contentPlaceholder": "输入 Prompt 内容",
+    "prompt.add": "添加 Prompt",
+    "prompt.count": "{visible} / {total} 条",
+    "prompt.importJson": "导入 JSON",
+    "prompt.exportJson": "导出 JSON",
+    "prompt.delete": "删除",
+    "prompt.itemMetaWithTime": "{category} · {time} · 单击复制",
+    "prompt.itemMetaNoTime": "{category} · 单击复制",
+    "prompt.deleteConfirm": "确认删除 Prompt「{title}」吗？",
+
+    "folder.defaultName": "新文件夹 {index}",
+    "folder.managerLabel": "文件夹",
+    "folder.ungrouped": "未分组",
+    "folder.create": "新建",
+    "folder.menuRename": "重命名",
+    "folder.menuDelete": "删除",
+    "folder.menuOpenAria": "打开文件夹菜单",
+    "folder.emptyHint": "拖动聊天到这里",
+    "folder.createPrompt": "输入文件夹名称",
+    "folder.renamePrompt": "重命名文件夹",
+    "folder.deleteConfirm": "删除文件夹“{name}”？其中会话会回到未分组。",
+  },
+};
+
+const normalizeToolkitLanguage = (value) => {
+  const nextValue = typeof value === "string" ? value.trim().toLowerCase() : "";
+  if (!nextValue) {
+    return null;
+  }
+  if (nextValue.startsWith("zh")) {
+    return "zh-CN";
+  }
+  if (nextValue.startsWith("en")) {
+    return "en";
+  }
+  return null;
+};
+
+const getLanguageDisplayName = (language) => {
+  if (language === "zh-CN") {
+    return t("language.chinese");
+  }
+  return t("language.english");
+};
+
+const detectToolkitLanguageFromBrowser = () => {
+  const candidates = Array.isArray(navigator.languages) && navigator.languages.length > 0
+    ? navigator.languages
+    : [navigator.language];
+
+  for (const candidate of candidates) {
+    const normalized = normalizeToolkitLanguage(candidate);
+    if (normalized && TOOLKIT_SUPPORTED_LANGUAGES.includes(normalized)) {
+      return normalized;
+    }
+  }
+
+  return DEFAULT_TOOLKIT_LANGUAGE;
+};
+
+const loadLanguagePreference = () => {
+  try {
+    const stored = localStorage.getItem(LANGUAGE_PREFERENCE_KEY);
+    if (!stored) {
+      return TOOLKIT_LANGUAGE_AUTO;
+    }
+    if (stored === TOOLKIT_LANGUAGE_AUTO) {
+      return TOOLKIT_LANGUAGE_AUTO;
+    }
+    return normalizeToolkitLanguage(stored) || TOOLKIT_LANGUAGE_AUTO;
+  } catch (error) {
+    return TOOLKIT_LANGUAGE_AUTO;
+  }
+};
+
+const saveLanguagePreference = (preference) => {
+  try {
+    localStorage.setItem(LANGUAGE_PREFERENCE_KEY, preference);
+  } catch (error) {
+    // Ignore storage write failures.
+  }
+};
+
+const getCurrentLanguage = () => i18nState.locale;
+const getLanguagePreference = () => i18nState.preference;
+
+const formatMessageTemplate = (template, params = {}) =>
+  template.replace(/\{(\w+)\}/g, (matched, key) => {
+    const value = params[key];
+    return value === null || value === undefined ? matched : String(value);
+  });
+
+const t = (key, params = {}) => {
+  const locale = getCurrentLanguage();
+  const localized =
+    I18N_MESSAGES[locale]?.[key] ||
+    I18N_MESSAGES[DEFAULT_TOOLKIT_LANGUAGE]?.[key] ||
+    key;
+  return formatMessageTemplate(localized, params);
+};
+
+const getLanguageMenuLabel = (preference) => {
+  if (preference === TOOLKIT_LANGUAGE_AUTO) {
+    return t("language.autoWithLocale", {
+      language: getLanguageDisplayName(i18nState.detected),
+    });
+  }
+
+  return getLanguageDisplayName(preference);
+};
+
+const refreshLocalizedUi = () => {
+  if (typeof refreshToolbarLocalization === "function") {
+    refreshToolbarLocalization();
+  }
+  if (typeof refreshTimelineLocalization === "function") {
+    refreshTimelineLocalization();
+  }
+  if (typeof refreshPromptLocalization === "function") {
+    refreshPromptLocalization();
+  }
+  if (typeof refreshFolderLocalization === "function") {
+    refreshFolderLocalization();
+  }
+};
+
+const setLanguagePreference = (preference, options = {}) => {
+  const { persist = true, refresh = true } = options;
+  const normalizedPreference =
+    preference === TOOLKIT_LANGUAGE_AUTO
+      ? TOOLKIT_LANGUAGE_AUTO
+      : normalizeToolkitLanguage(preference) || DEFAULT_TOOLKIT_LANGUAGE;
+
+  i18nState.preference = normalizedPreference;
+  i18nState.detected = detectToolkitLanguageFromBrowser();
+  i18nState.locale =
+    normalizedPreference === TOOLKIT_LANGUAGE_AUTO ? i18nState.detected : normalizedPreference;
+
+  if (persist) {
+    saveLanguagePreference(normalizedPreference);
+  }
+
+  if (refresh) {
+    refreshLocalizedUi();
+  }
+};
+
+const initI18n = () => {
+  setLanguagePreference(loadLanguagePreference(), {
+    persist: false,
+    refresh: false,
+  });
+};

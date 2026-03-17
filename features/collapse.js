@@ -5,7 +5,7 @@ const collapseOldMessages = () => {
   ensureConversationState();
   const nodes = getMessageNodes();
   if (nodes.length <= state.keepLatest) {
-    updateStatus("当前消息数量较少，无需优化。", "info");
+    updateStatusByKey("status.collapseNoNeed", "info");
     return;
   }
 
@@ -35,14 +35,14 @@ const collapseOldMessages = () => {
   updateSearchUI();
 
   state.isCollapsed = true;
-  updateStatus(`已优化：隐藏 ${toCollapse.length} 条旧消息。`, "success");
+  updateStatusByKey("status.collapseDone", "success", { count: toCollapse.length });
   renderTimeline();
 };
 
 const restoreMessages = () => {
   ensureConversationState();
   if (!state.isCollapsed) {
-    updateStatus("没有需要恢复的消息。", "info");
+    updateStatusByKey("status.restoreNone", "info");
     return;
   }
 
@@ -108,6 +108,6 @@ const restoreMessages = () => {
   state.anchorNode = null;
   state.anchorParent = null;
   state.isCollapsed = false;
-  updateStatus("已恢复所有消息。", "success");
+  updateStatusByKey("status.restoreDone", "success");
   renderTimeline();
 };
