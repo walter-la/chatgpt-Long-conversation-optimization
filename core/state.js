@@ -90,6 +90,7 @@ const folderState = {
   draggingFolderId: null,
   currentDropZoneKey: "",
   currentSortZoneKey: "",
+  dragLayout: null,
   refreshQueued: false,
   refreshPending: false,
 };

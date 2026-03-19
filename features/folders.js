@@ -258,6 +258,11 @@ const getVisibleRect = (node) => {
   return rect;
 };
 
+const getFolderHistoryChildren = () =>
+  !(folderState.history instanceof HTMLElement)
+    ? []
+    : Array.from(folderState.history.children).filter((child) => child instanceof HTMLElement);
+
 const isPointInsideRect = (clientX, clientY, rect, padding = 0) => {
   if (!rect || !Number.isFinite(clientX) || !Number.isFinite(clientY)) {
     return false;
@@ -418,6 +423,199 @@ const clearFolderSortHighlight = () => {
     });
 };
 
+const buildConversationDropLayout = () => {
+  const manager = document.getElementById(FOLDER_MANAGER_ID);
+  const ungroupedButton =
+    manager?.querySelector?.('[data-folder-action="show-ungrouped"]') instanceof HTMLButtonElement
+      ? manager.querySelector('[data-folder-action="show-ungrouped"]')
+      : null;
+  const ungroupedButtonRect = getVisibleRect(ungroupedButton);
+
+  if (!(folderState.history instanceof HTMLElement)) {
+    return null;
+  }
+
+  const historyRect = folderState.history.getBoundingClientRect();
+  const historyChildren = getFolderHistoryChildren();
+  const sortedFolders = getSortedFolders();
+  const firstUngroupedItem = historyChildren.find(
+    (child) => child instanceof HTMLAnchorElement && !child.hasAttribute(FOLDER_ITEM_ATTR),
+  );
+  const firstUngroupedRect = getVisibleRect(firstUngroupedItem);
+  const fallbackBottomBoundary = firstUngroupedRect ? firstUngroupedRect.top : historyRect.bottom;
+
+  const folderZones = sortedFolders
+    .map((folder, index) => {
+      const header = historyChildren.find(
+        (child) =>
+          child.classList.contains(FOLDER_HEADER_CLASS) &&
+          child.dataset.folderId === folder.id,
+      );
+      if (!(header instanceof HTMLElement)) {
+        return null;
+      }
+
+      const segmentNodes = historyChildren.filter((child) => {
+        if (!(child instanceof HTMLElement)) {
+          return false;
+        }
+
+        if (child === header) {
+          return true;
+        }
+
+        if (child.classList.contains(FOLDER_EMPTY_CLASS) && child.dataset.folderId === folder.id) {
+          return true;
+        }
+
+        return (
+          child instanceof HTMLAnchorElement &&
+          child.getAttribute(FOLDER_ITEM_ATTR) === folder.id &&
+          !child.hasAttribute(FOLDER_COLLAPSED_ATTR)
+        );
+      });
+
+      const segmentRects = segmentNodes.map((node) => getVisibleRect(node)).filter(Boolean);
+      if (segmentRects.length === 0) {
+        return null;
+      }
+
+      let nextBoundaryTop = fallbackBottomBoundary;
+      for (let cursor = index + 1; cursor < sortedFolders.length; cursor += 1) {
+        const nextHeader = historyChildren.find(
+          (child) =>
+            child.classList.contains(FOLDER_HEADER_CLASS) &&
+            child.dataset.folderId === sortedFolders[cursor].id,
+        );
+        const nextHeaderRect = getVisibleRect(nextHeader);
+        if (nextHeaderRect) {
+          nextBoundaryTop = nextHeaderRect.top;
+          break;
+        }
+      }
+
+      const naturalTop = Math.min(...segmentRects.map((rect) => rect.top));
+      const naturalBottom = Math.max(...segmentRects.map((rect) => rect.bottom));
+      const availableGap = Math.max(0, nextBoundaryTop - naturalBottom);
+      const extendedBottom = naturalBottom + Math.min(18, availableGap / 2);
+
+      return {
+        type: "folder",
+        key: `folder:${folder.id}`,
+        folderId: folder.id,
+        element: null,
+        indirect: true,
+        top: naturalTop - 6,
+        bottom: extendedBottom + 6,
+      };
+    })
+    .filter(Boolean);
+
+  const ungroupedItems = historyChildren.filter(
+    (child) => child instanceof HTMLAnchorElement && !child.hasAttribute(FOLDER_ITEM_ATTR),
+  );
+  const ungroupedRects = ungroupedItems.map((node) => getVisibleRect(node)).filter(Boolean);
+  const ungroupedRange =
+    ungroupedRects.length === 0
+      ? null
+      : {
+          top: Math.min(...ungroupedRects.map((rect) => rect.top)) - 6,
+          bottom: Math.max(...ungroupedRects.map((rect) => rect.bottom)) + 6,
+          element: ungroupedButton || ungroupedItems[0],
+        };
+
+  return {
+    historyRect,
+    ungroupedButton,
+    ungroupedButtonRect,
+    folderZones,
+    ungroupedRange,
+  };
+};
+
+const buildFolderSortLayout = () => {
+  if (!(folderState.history instanceof HTMLElement) || !folderState.draggingFolderId) {
+    return null;
+  }
+
+  const historyRect = folderState.history.getBoundingClientRect();
+  const historyChildren = getFolderHistoryChildren();
+  const segments = getSortedFolders()
+    .filter((folder) => folder.id !== folderState.draggingFolderId)
+    .map((folder) => {
+      const header = historyChildren.find(
+        (child) =>
+          child.classList.contains(FOLDER_HEADER_CLASS) &&
+          child.dataset.folderId === folder.id,
+      );
+      if (!(header instanceof HTMLElement)) {
+        return null;
+      }
+
+      const segmentNodes = historyChildren.filter((child) => {
+        if (!(child instanceof HTMLElement)) {
+          return false;
+        }
+
+        if (child === header) {
+          return true;
+        }
+
+        if (child.classList.contains(FOLDER_EMPTY_CLASS) && child.dataset.folderId === folder.id) {
+          return true;
+        }
+
+        return child instanceof HTMLAnchorElement && child.getAttribute(FOLDER_ITEM_ATTR) === folder.id;
+      });
+
+      const segmentRects = segmentNodes.map((node) => getVisibleRect(node)).filter(Boolean);
+      if (segmentRects.length === 0) {
+        return null;
+      }
+
+      return {
+        folderId: folder.id,
+        header,
+        top: Math.min(...segmentRects.map((rect) => rect.top)),
+        bottom: Math.max(...segmentRects.map((rect) => rect.bottom)),
+      };
+    })
+    .filter(Boolean);
+
+  return {
+    historyRect,
+    segments,
+  };
+};
+
+const prepareFolderDragLayout = (type) => {
+  if (type === "folder-sort") {
+    folderState.dragLayout = {
+      type,
+      value: buildFolderSortLayout(),
+    };
+    return;
+  }
+
+  folderState.dragLayout = {
+    type: "conversation",
+    value: buildConversationDropLayout(),
+  };
+};
+
+const getFolderDragLayout = (type) => {
+  if (folderState.dragLayout?.type === type && folderState.dragLayout.value) {
+    return folderState.dragLayout.value;
+  }
+
+  const nextValue = type === "folder-sort" ? buildFolderSortLayout() : buildConversationDropLayout();
+  folderState.dragLayout = {
+    type,
+    value: nextValue,
+  };
+  return nextValue;
+};
+
 const setDropZoneHighlight = (element, key) => {
   if (!(element instanceof HTMLElement)) {
     clearDropZoneHighlight();
@@ -460,6 +658,7 @@ const setFolderSortHighlight = (element, key, position) => {
 const clearFolderDragState = () => {
   folderState.draggingConversationId = null;
   folderState.draggingFolderId = null;
+  folderState.dragLayout = null;
   document.documentElement.removeAttribute(FOLDER_DRAGGING_ATTR);
   clearDropZoneHighlight();
   clearFolderSortHighlight();
@@ -878,141 +1077,48 @@ const getDropZoneFromManagedArea = (clientX, clientY) => {
     return null;
   }
 
-  const manager = document.getElementById(FOLDER_MANAGER_ID);
-  const ungroupedButton =
-    manager?.querySelector?.('[data-folder-action="show-ungrouped"]') instanceof HTMLButtonElement
-      ? manager.querySelector('[data-folder-action="show-ungrouped"]')
-      : null;
-  const ungroupedButtonRect = getVisibleRect(ungroupedButton);
+  const layout = getFolderDragLayout("conversation");
+  if (!layout) {
+    return null;
+  }
 
-  if (ungroupedButtonRect && isPointInsideRect(clientX, clientY, ungroupedButtonRect, 10)) {
+  if (layout.ungroupedButtonRect && isPointInsideRect(clientX, clientY, layout.ungroupedButtonRect, 10)) {
     return {
       type: "ungrouped",
       key: "ungrouped",
-      element: ungroupedButton,
+      element: layout.ungroupedButton,
       indirect: true,
       allowHighlight: true,
     };
   }
 
-  if (!(folderState.history instanceof HTMLElement)) {
-    return null;
-  }
-
-  const historyRect = folderState.history.getBoundingClientRect();
   if (
-    clientX < historyRect.left ||
-    clientX > historyRect.right ||
-    clientY < historyRect.top ||
-    clientY > historyRect.bottom
+    clientX < layout.historyRect.left ||
+    clientX > layout.historyRect.right ||
+    clientY < layout.historyRect.top ||
+    clientY > layout.historyRect.bottom
   ) {
     return null;
   }
 
-  const historyChildren = Array.from(folderState.history.children).filter(
-    (child) => child instanceof HTMLElement,
-  );
-  const sortedFolders = getSortedFolders();
-  const firstUngroupedItem = historyChildren.find(
-    (child) => child instanceof HTMLAnchorElement && !child.hasAttribute(FOLDER_ITEM_ATTR),
-  );
-  const firstUngroupedRect = getVisibleRect(firstUngroupedItem);
-  const fallbackBottomBoundary = firstUngroupedRect ? firstUngroupedRect.top : historyRect.bottom;
-
-  const folderZones = sortedFolders
-    .map((folder, index) => {
-      const header = historyChildren.find(
-        (child) =>
-          child.classList.contains(FOLDER_HEADER_CLASS) &&
-          child.dataset.folderId === folder.id,
-      );
-      if (!(header instanceof HTMLElement)) {
-        return null;
-      }
-
-      const segmentNodes = historyChildren.filter((child) => {
-        if (!(child instanceof HTMLElement)) {
-          return false;
-        }
-
-        if (child === header) {
-          return true;
-        }
-
-        if (child.classList.contains(FOLDER_EMPTY_CLASS) && child.dataset.folderId === folder.id) {
-          return true;
-        }
-
-        if (
-          child instanceof HTMLAnchorElement &&
-          child.getAttribute(FOLDER_ITEM_ATTR) === folder.id &&
-          !child.hasAttribute(FOLDER_COLLAPSED_ATTR)
-        ) {
-          return true;
-        }
-
-        return false;
-      });
-
-      const segmentRects = segmentNodes.map((node) => getVisibleRect(node)).filter(Boolean);
-      if (segmentRects.length === 0) {
-        return null;
-      }
-
-      let nextBoundaryTop = fallbackBottomBoundary;
-      for (let cursor = index + 1; cursor < sortedFolders.length; cursor += 1) {
-        const nextHeader = historyChildren.find(
-          (child) =>
-            child.classList.contains(FOLDER_HEADER_CLASS) &&
-            child.dataset.folderId === sortedFolders[cursor].id,
-        );
-        const nextHeaderRect = getVisibleRect(nextHeader);
-        if (nextHeaderRect) {
-          nextBoundaryTop = nextHeaderRect.top;
-          break;
-        }
-      }
-
-      const naturalTop = Math.min(...segmentRects.map((rect) => rect.top));
-      const naturalBottom = Math.max(...segmentRects.map((rect) => rect.bottom));
-      const availableGap = Math.max(0, nextBoundaryTop - naturalBottom);
-      const extendedBottom = naturalBottom + Math.min(18, availableGap / 2);
-
-      return {
-        type: "folder",
-        key: `folder:${folder.id}`,
-        folderId: folder.id,
-        element: null,
-        indirect: true,
-        top: naturalTop - 6,
-        bottom: extendedBottom + 6,
-      };
-    })
-    .filter(Boolean);
-
-  const matchedFolderZone = folderZones.find((zone) => clientY >= zone.top && clientY <= zone.bottom) || null;
+  const matchedFolderZone =
+    layout.folderZones.find((zone) => clientY >= zone.top && clientY <= zone.bottom) || null;
   if (matchedFolderZone) {
     return matchedFolderZone;
   }
 
-  const ungroupedItems = historyChildren.filter(
-    (child) => child instanceof HTMLAnchorElement && !child.hasAttribute(FOLDER_ITEM_ATTR),
-  );
-  const ungroupedRects = ungroupedItems.map((node) => getVisibleRect(node)).filter(Boolean);
-  if (ungroupedRects.length === 0) {
+  if (!layout.ungroupedRange) {
     return null;
   }
 
-  const ungroupedTop = Math.min(...ungroupedRects.map((rect) => rect.top)) - 6;
-  const ungroupedBottom = Math.max(...ungroupedRects.map((rect) => rect.bottom)) + 6;
-  if (clientY < ungroupedTop || clientY > ungroupedBottom) {
+  if (clientY < layout.ungroupedRange.top || clientY > layout.ungroupedRange.bottom) {
     return null;
   }
 
   return {
     type: "ungrouped",
     key: "ungrouped",
-    element: ungroupedButton || ungroupedItems[0],
+    element: layout.ungroupedRange.element,
     indirect: true,
     allowHighlight: true,
   };
@@ -1028,67 +1134,23 @@ const getDropZoneFromEvent = (event) => {
 };
 
 const getFolderSortPlacement = (clientX, clientY) => {
-  if (!(folderState.history instanceof HTMLElement) || !folderState.draggingFolderId) {
+  const layout = getFolderDragLayout("folder-sort");
+  if (!layout) {
     return null;
   }
 
-  const historyRect = folderState.history.getBoundingClientRect();
   if (
     !Number.isFinite(clientX) ||
     !Number.isFinite(clientY) ||
-    clientX < historyRect.left - 16 ||
-    clientX > historyRect.right + 16 ||
-    clientY < historyRect.top - 8 ||
-    clientY > historyRect.bottom + 8
+    clientX < layout.historyRect.left - 16 ||
+    clientX > layout.historyRect.right + 16 ||
+    clientY < layout.historyRect.top - 8 ||
+    clientY > layout.historyRect.bottom + 8
   ) {
     return null;
   }
 
-  const historyChildren = Array.from(folderState.history.children).filter(
-    (child) => child instanceof HTMLElement,
-  );
-  const segments = getSortedFolders()
-    .filter((folder) => folder.id !== folderState.draggingFolderId)
-    .map((folder) => {
-      const header = historyChildren.find(
-        (child) =>
-          child.classList.contains(FOLDER_HEADER_CLASS) &&
-          child.dataset.folderId === folder.id,
-      );
-      if (!(header instanceof HTMLElement)) {
-        return null;
-      }
-
-      const segmentNodes = historyChildren.filter((child) => {
-        if (!(child instanceof HTMLElement)) {
-          return false;
-        }
-
-        if (child === header) {
-          return true;
-        }
-
-        if (child.classList.contains(FOLDER_EMPTY_CLASS) && child.dataset.folderId === folder.id) {
-          return true;
-        }
-
-        return child instanceof HTMLAnchorElement && child.getAttribute(FOLDER_ITEM_ATTR) === folder.id;
-      });
-
-      const segmentRects = segmentNodes.map((node) => getVisibleRect(node)).filter(Boolean);
-      if (segmentRects.length === 0) {
-        return null;
-      }
-
-      return {
-        folderId: folder.id,
-        header,
-        top: Math.min(...segmentRects.map((rect) => rect.top)),
-        bottom: Math.max(...segmentRects.map((rect) => rect.bottom)),
-      };
-    })
-    .filter(Boolean);
-
+  const { segments } = layout;
   if (segments.length === 0) {
     return null;
   }
@@ -1382,6 +1444,7 @@ const handleFolderDragStart = (event) => {
 
     folderState.draggingFolderId = folderId;
     folderState.draggingConversationId = null;
+    prepareFolderDragLayout("folder-sort");
     document.documentElement.setAttribute(FOLDER_SORTING_ATTR, "1");
     clearDropZoneHighlight();
     folderHeader.classList.add("is-sort-dragging");
@@ -1409,6 +1472,7 @@ const handleFolderDragStart = (event) => {
 
   folderState.draggingConversationId = conversationId;
   folderState.draggingFolderId = null;
+  prepareFolderDragLayout("conversation");
   clearFolderSortHighlight();
   document.documentElement.setAttribute(FOLDER_DRAGGING_ATTR, "1");
 
