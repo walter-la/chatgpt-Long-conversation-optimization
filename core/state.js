@@ -84,6 +84,7 @@ const folderState = {
   loaded: false,
   folders: [],
   assignments: {},
+  itemOrders: {},
   section: null,
   headerButton: null,
   history: null,

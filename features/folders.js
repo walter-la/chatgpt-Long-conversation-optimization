@@ -97,10 +97,38 @@ const normalizeFolderSnapshot = (snapshot) => {
     }
   });
 
+  const rawItemOrders = snapshot?.itemOrders && typeof snapshot.itemOrders === "object"
+    ? snapshot.itemOrders
+    : {};
+  const itemOrders = {};
+
+  folders.forEach((folder) => {
+    const rawOrder = Array.isArray(rawItemOrders[folder.id]) ? rawItemOrders[folder.id] : [];
+    const nextOrder = [];
+    const seenConversationIds = new Set();
+
+    rawOrder.forEach((conversationId) => {
+      if (
+        typeof conversationId === "string" &&
+        conversationId &&
+        assignments[conversationId] === folder.id &&
+        !seenConversationIds.has(conversationId)
+      ) {
+        seenConversationIds.add(conversationId);
+        nextOrder.push(conversationId);
+      }
+    });
+
+    if (nextOrder.length > 0) {
+      itemOrders[folder.id] = nextOrder;
+    }
+  });
+
   return {
-    version: 1,
+    version: 2,
     folders,
     assignments,
+    itemOrders,
   };
 };
 
@@ -114,8 +142,33 @@ const buildFolderSnapshot = () => {
     }
   });
 
+  const itemOrders = {};
+  Object.entries(folderState.itemOrders || {}).forEach(([folderId, conversationIds]) => {
+    if (!folderIds.has(folderId) || !Array.isArray(conversationIds)) {
+      return;
+    }
+
+    const nextOrder = [];
+    const seenConversationIds = new Set();
+    conversationIds.forEach((conversationId) => {
+      if (
+        typeof conversationId === "string" &&
+        conversationId &&
+        assignments[conversationId] === folderId &&
+        !seenConversationIds.has(conversationId)
+      ) {
+        seenConversationIds.add(conversationId);
+        nextOrder.push(conversationId);
+      }
+    });
+
+    if (nextOrder.length > 0) {
+      itemOrders[folderId] = nextOrder;
+    }
+  });
+
   return {
-    version: 1,
+    version: 2,
     folders: getSortedFolders().map((folder, index) => ({
       id: folder.id,
       name: folder.name,
@@ -124,6 +177,7 @@ const buildFolderSnapshot = () => {
       createdAt: folder.createdAt,
     })),
     assignments,
+    itemOrders,
   };
 };
 
@@ -131,6 +185,7 @@ const setFolderSnapshot = (snapshot) => {
   const normalized = normalizeFolderSnapshot(snapshot);
   folderState.folders = normalized.folders;
   folderState.assignments = normalized.assignments;
+  folderState.itemOrders = normalized.itemOrders;
   folderState.loaded = true;
   return normalized;
 };
@@ -279,6 +334,200 @@ const isPointInsideRect = (clientX, clientY, rect, padding = 0) => {
 const getFolderById = (folderId) =>
   folderState.folders.find((folder) => folder.id === folderId) || null;
 
+const getStoredFolderConversationIds = (folderId) =>
+  Array.isArray(folderState.itemOrders?.[folderId])
+    ? folderState.itemOrders[folderId].filter((conversationId) => typeof conversationId === "string" && conversationId)
+    : [];
+
+const setStoredFolderConversationIds = (folderId, conversationIds) => {
+  if (!folderId) {
+    return;
+  }
+
+  const nextOrder = [];
+  const seenConversationIds = new Set();
+  (Array.isArray(conversationIds) ? conversationIds : []).forEach((conversationId) => {
+    if (
+      typeof conversationId === "string" &&
+      conversationId &&
+      !seenConversationIds.has(conversationId)
+    ) {
+      seenConversationIds.add(conversationId);
+      nextOrder.push(conversationId);
+    }
+  });
+
+  if (nextOrder.length === 0) {
+    delete folderState.itemOrders[folderId];
+    return;
+  }
+
+  folderState.itemOrders[folderId] = nextOrder;
+};
+
+const removeConversationFromFolderOrders = (conversationId, folderId = "") => {
+  if (!conversationId) {
+    return false;
+  }
+
+  const targetFolderIds = folderId ? [folderId] : Object.keys(folderState.itemOrders || {});
+  let changed = false;
+
+  targetFolderIds.forEach((currentFolderId) => {
+    const storedOrder = getStoredFolderConversationIds(currentFolderId);
+    if (storedOrder.length === 0 || !storedOrder.includes(conversationId)) {
+      return;
+    }
+
+    const nextOrder = storedOrder.filter((currentConversationId) => currentConversationId !== conversationId);
+    setStoredFolderConversationIds(currentFolderId, nextOrder);
+    changed = true;
+  });
+
+  return changed;
+};
+
+const getAssignedConversationIdsForFolder = (folderId) =>
+  Object.entries(folderState.assignments)
+    .filter(([, assignedFolderId]) => assignedFolderId === folderId)
+    .map(([conversationId]) => conversationId);
+
+const getCurrentFolderConversationIds = (folderId) => {
+  const assignedConversationIds = getAssignedConversationIdsForFolder(folderId);
+  if (assignedConversationIds.length === 0) {
+    return [];
+  }
+
+  const assignedConversationIdSet = new Set(assignedConversationIds);
+  const orderedConversationIds = [];
+  const seenConversationIds = new Set();
+
+  if (folderState.history instanceof HTMLElement) {
+    getConversationItems(folderState.history)
+      .map((item, index) => {
+        const conversationId = getConversationIdFromItem(item);
+        const orderValue = Number(item.style.order);
+        return {
+          conversationId,
+          item,
+          index,
+          order: Number.isFinite(orderValue) ? orderValue : Number.MAX_SAFE_INTEGER,
+        };
+      })
+      .filter(({ conversationId }) => conversationId && assignedConversationIdSet.has(conversationId))
+      .sort((left, right) => {
+        if (left.order !== right.order) {
+          return left.order - right.order;
+        }
+        return left.index - right.index;
+      })
+      .forEach(({ conversationId }) => {
+        if (seenConversationIds.has(conversationId)) {
+          return;
+        }
+        seenConversationIds.add(conversationId);
+        orderedConversationIds.push(conversationId);
+      });
+  }
+
+  getStoredFolderConversationIds(folderId).forEach((conversationId) => {
+    if (!assignedConversationIdSet.has(conversationId) || seenConversationIds.has(conversationId)) {
+      return;
+    }
+    seenConversationIds.add(conversationId);
+    orderedConversationIds.push(conversationId);
+  });
+
+  assignedConversationIds.forEach((conversationId) => {
+    if (seenConversationIds.has(conversationId)) {
+      return;
+    }
+    seenConversationIds.add(conversationId);
+    orderedConversationIds.push(conversationId);
+  });
+
+  return orderedConversationIds;
+};
+
+const getRenderableFolderConversationIds = (folderId, fallbackConversationIds = []) => {
+  const validConversationIds = new Set(
+    (Array.isArray(fallbackConversationIds) ? fallbackConversationIds : []).filter(
+      (conversationId) => typeof conversationId === "string" && conversationId,
+    ),
+  );
+
+  const orderedConversationIds = [];
+  const seenConversationIds = new Set();
+
+  getStoredFolderConversationIds(folderId).forEach((conversationId) => {
+    if (!validConversationIds.has(conversationId) || seenConversationIds.has(conversationId)) {
+      return;
+    }
+    seenConversationIds.add(conversationId);
+    orderedConversationIds.push(conversationId);
+  });
+
+  validConversationIds.forEach((conversationId) => {
+    if (seenConversationIds.has(conversationId)) {
+      return;
+    }
+    seenConversationIds.add(conversationId);
+    orderedConversationIds.push(conversationId);
+  });
+
+  return orderedConversationIds;
+};
+
+const orderConversationItemsForFolder = (folderId, items) => {
+  if (!Array.isArray(items) || items.length <= 1) {
+    return items || [];
+  }
+
+  const itemsByConversationId = new Map();
+  const fallbackItems = [];
+
+  items.forEach((item) => {
+    const conversationId = getConversationIdFromItem(item);
+    if (!conversationId || itemsByConversationId.has(conversationId)) {
+      fallbackItems.push(item);
+      return;
+    }
+    itemsByConversationId.set(conversationId, item);
+  });
+
+  const fallbackConversationIds = items
+    .map((item) => getConversationIdFromItem(item))
+    .filter((conversationId, index, array) => conversationId && array.indexOf(conversationId) === index);
+  const orderedConversationIds = getRenderableFolderConversationIds(folderId, fallbackConversationIds);
+  const orderedItems = [];
+  const usedConversationIds = new Set();
+
+  orderedConversationIds.forEach((conversationId) => {
+    const item = itemsByConversationId.get(conversationId);
+    if (!(item instanceof HTMLAnchorElement)) {
+      return;
+    }
+    usedConversationIds.add(conversationId);
+    orderedItems.push(item);
+  });
+
+  items.forEach((item) => {
+    const conversationId = getConversationIdFromItem(item);
+    if (conversationId && usedConversationIds.has(conversationId)) {
+      return;
+    }
+    orderedItems.push(item);
+  });
+
+  fallbackItems.forEach((item) => {
+    if (!orderedItems.includes(item)) {
+      orderedItems.push(item);
+    }
+  });
+
+  return orderedItems;
+};
+
 const getNextFolderName = () => t("folder.defaultName", { index: folderState.folders.length + 1 });
 
 const closeFolderMenu = () => {
@@ -397,12 +646,20 @@ const clearDropZoneHighlight = () => {
 
   const manager = document.getElementById(FOLDER_MANAGER_ID);
   manager
-    ?.querySelectorAll(".is-drop-target")
-    .forEach((node) => node.classList.remove("is-drop-target"));
+    ?.querySelectorAll(".is-drop-target, .is-drop-target-before, .is-drop-target-after")
+    .forEach((node) => {
+      node.classList.remove("is-drop-target");
+      node.classList.remove("is-drop-target-before");
+      node.classList.remove("is-drop-target-after");
+    });
 
   folderState.history
-    .querySelectorAll(".is-drop-target")
-    .forEach((node) => node.classList.remove("is-drop-target"));
+    .querySelectorAll(".is-drop-target, .is-drop-target-before, .is-drop-target-after")
+    .forEach((node) => {
+      node.classList.remove("is-drop-target");
+      node.classList.remove("is-drop-target-before");
+      node.classList.remove("is-drop-target-after");
+    });
 };
 
 const clearFolderSortHighlight = () => {
@@ -425,6 +682,7 @@ const clearFolderSortHighlight = () => {
 
 const buildConversationDropLayout = () => {
   const manager = document.getElementById(FOLDER_MANAGER_ID);
+  const draggedConversationId = folderState.draggingConversationId || "";
   const ungroupedButton =
     manager?.querySelector?.('[data-folder-action="show-ungrouped"]') instanceof HTMLButtonElement
       ? manager.querySelector('[data-folder-action="show-ungrouped"]')
@@ -455,6 +713,42 @@ const buildConversationDropLayout = () => {
         return null;
       }
 
+      const emptyState = historyChildren.find(
+        (child) =>
+          child.classList.contains(FOLDER_EMPTY_CLASS) &&
+          child.dataset.folderId === folder.id,
+      );
+      const itemPlacements = historyChildren
+        .filter(
+          (child) => {
+            if (
+              !(child instanceof HTMLAnchorElement) ||
+              child.getAttribute(FOLDER_ITEM_ATTR) !== folder.id ||
+              child.hasAttribute(FOLDER_COLLAPSED_ATTR)
+            ) {
+              return false;
+            }
+
+            const conversationId = getConversationIdFromItem(child);
+            return conversationId && conversationId !== draggedConversationId;
+          },
+        )
+        .map((item) => {
+          const rect = getVisibleRect(item);
+          const conversationId = getConversationIdFromItem(item);
+          if (!rect || !conversationId) {
+            return null;
+          }
+          return {
+            conversationId,
+            element: item,
+            top: rect.top,
+            bottom: rect.bottom,
+            midpoint: rect.top + rect.height / 2,
+          };
+        })
+        .filter(Boolean);
+
       const segmentNodes = historyChildren.filter((child) => {
         if (!(child instanceof HTMLElement)) {
           return false;
@@ -464,15 +758,20 @@ const buildConversationDropLayout = () => {
           return true;
         }
 
-        if (child.classList.contains(FOLDER_EMPTY_CLASS) && child.dataset.folderId === folder.id) {
+        if (child === emptyState) {
           return true;
         }
 
-        return (
-          child instanceof HTMLAnchorElement &&
-          child.getAttribute(FOLDER_ITEM_ATTR) === folder.id &&
-          !child.hasAttribute(FOLDER_COLLAPSED_ATTR)
-        );
+        if (
+          !(child instanceof HTMLAnchorElement) ||
+          child.getAttribute(FOLDER_ITEM_ATTR) !== folder.id ||
+          child.hasAttribute(FOLDER_COLLAPSED_ATTR)
+        ) {
+          return false;
+        }
+
+        const conversationId = getConversationIdFromItem(child);
+        return conversationId && conversationId !== draggedConversationId;
       });
 
       const segmentRects = segmentNodes.map((node) => getVisibleRect(node)).filter(Boolean);
@@ -504,9 +803,11 @@ const buildConversationDropLayout = () => {
         key: `folder:${folder.id}`,
         folderId: folder.id,
         element: null,
-        indirect: true,
         top: naturalTop - 6,
         bottom: extendedBottom + 6,
+        header,
+        emptyState: emptyState instanceof HTMLElement ? emptyState : null,
+        itemPlacements,
       };
     })
     .filter(Boolean);
@@ -530,6 +831,90 @@ const buildConversationDropLayout = () => {
     ungroupedButtonRect,
     folderZones,
     ungroupedRange,
+  };
+};
+
+const buildConversationDropPlacementFromFolderZone = (zone, clientY) => {
+  if (!zone?.folderId) {
+    return null;
+  }
+
+  const placements = Array.isArray(zone.itemPlacements) ? zone.itemPlacements : [];
+  if (placements.length === 0) {
+    return {
+      type: "folder",
+      key: `folder:${zone.folderId}:append`,
+      folderId: zone.folderId,
+      targetConversationId: null,
+      position: "after",
+      element: zone.emptyState || zone.header,
+      highlightMode: "fill",
+    };
+  }
+
+  if (!Number.isFinite(clientY) || clientY <= placements[0].midpoint) {
+    return {
+      type: "folder",
+      key: `folder:${zone.folderId}:before:${placements[0].conversationId}`,
+      folderId: zone.folderId,
+      targetConversationId: placements[0].conversationId,
+      position: "before",
+      element: placements[0].element,
+      highlightMode: "before",
+    };
+  }
+
+  for (let index = 0; index < placements.length; index += 1) {
+    const placement = placements[index];
+    if (clientY <= placement.bottom) {
+      const position = clientY < placement.midpoint ? "before" : "after";
+      return {
+        type: "folder",
+        key: `folder:${zone.folderId}:${position}:${placement.conversationId}`,
+        folderId: zone.folderId,
+        targetConversationId: placement.conversationId,
+        position,
+        element: placement.element,
+        highlightMode: position,
+      };
+    }
+
+    const nextPlacement = placements[index + 1];
+    if (nextPlacement && clientY < nextPlacement.top) {
+      const gapMidpoint = placement.bottom + (nextPlacement.top - placement.bottom) / 2;
+      if (clientY < gapMidpoint) {
+        return {
+          type: "folder",
+          key: `folder:${zone.folderId}:after:${placement.conversationId}`,
+          folderId: zone.folderId,
+          targetConversationId: placement.conversationId,
+          position: "after",
+          element: placement.element,
+          highlightMode: "after",
+        };
+      }
+
+      return {
+        type: "folder",
+        key: `folder:${zone.folderId}:before:${nextPlacement.conversationId}`,
+        folderId: zone.folderId,
+        targetConversationId: nextPlacement.conversationId,
+        position: "before",
+        element: nextPlacement.element,
+        highlightMode: "before",
+      };
+    }
+  }
+
+  const lastPlacement = placements[placements.length - 1];
+  return {
+    type: "folder",
+    key: `folder:${zone.folderId}:after:${lastPlacement.conversationId}`,
+    folderId: zone.folderId,
+    targetConversationId: lastPlacement.conversationId,
+    position: "after",
+    element: lastPlacement.element,
+    highlightMode: "after",
   };
 };
 
@@ -616,19 +1001,26 @@ const getFolderDragLayout = (type) => {
   return nextValue;
 };
 
-const setDropZoneHighlight = (element, key) => {
+const setDropZoneHighlight = (element, key, mode = "fill") => {
   if (!(element instanceof HTMLElement)) {
     clearDropZoneHighlight();
     return;
   }
 
-  if (folderState.currentDropZoneKey === key && element.classList.contains("is-drop-target")) {
+  const nextClass =
+    mode === "before"
+      ? "is-drop-target-before"
+      : mode === "after"
+        ? "is-drop-target-after"
+        : "is-drop-target";
+
+  if (folderState.currentDropZoneKey === key && element.classList.contains(nextClass)) {
     return;
   }
 
   clearDropZoneHighlight();
   folderState.currentDropZoneKey = key;
-  element.classList.add("is-drop-target");
+  element.classList.add(nextClass);
 };
 
 const setFolderSortHighlight = (element, key, position) => {
@@ -786,6 +1178,7 @@ const deleteFolder = (folderId) => {
       delete folderState.assignments[conversationId];
     }
   });
+  delete folderState.itemOrders[folderId];
 
   closeFolderMenu();
   persistFolderState();
@@ -852,11 +1245,19 @@ const assignConversationToFolder = (conversationId, folderId) => {
     return;
   }
 
-  if (folderState.assignments[conversationId] === folderId) {
-    return;
+  const sourceFolderId = folderState.assignments[conversationId] || "";
+  const targetConversationIds = getCurrentFolderConversationIds(folderId).filter(
+    (currentConversationId) => currentConversationId !== conversationId,
+  );
+
+  if (sourceFolderId && sourceFolderId !== folderId) {
+    removeConversationFromFolderOrders(conversationId, sourceFolderId);
+  } else {
+    removeConversationFromFolderOrders(conversationId);
   }
 
   folderState.assignments[conversationId] = folderId;
+  setStoredFolderConversationIds(folderId, [...targetConversationIds, conversationId]);
   persistFolderState();
   scheduleFolderRefresh();
   scheduleSettledFolderRefresh();
@@ -867,7 +1268,66 @@ const unassignConversation = (conversationId) => {
     return;
   }
 
+  removeConversationFromFolderOrders(conversationId, folderState.assignments[conversationId]);
   delete folderState.assignments[conversationId];
+  persistFolderState();
+  scheduleFolderRefresh();
+  scheduleSettledFolderRefresh();
+};
+
+const moveConversationToFolderPosition = (conversationId, folderId, options = {}) => {
+  if (!conversationId || !folderId || !getFolderById(folderId)) {
+    return;
+  }
+
+  const { targetConversationId = null, position = "after" } = options;
+  const sourceFolderId = folderState.assignments[conversationId] || "";
+
+  if (sourceFolderId === folderId && targetConversationId === conversationId) {
+    return;
+  }
+
+  const sourceConversationIds =
+    sourceFolderId && sourceFolderId !== folderId ? getCurrentFolderConversationIds(sourceFolderId) : [];
+  const baseTargetConversationIds = getCurrentFolderConversationIds(folderId);
+  const targetConversationIds = baseTargetConversationIds.filter(
+    (currentConversationId) => currentConversationId !== conversationId,
+  );
+
+  let insertIndex = targetConversationIds.length;
+  if (targetConversationId) {
+    const targetIndex = targetConversationIds.indexOf(targetConversationId);
+    if (targetIndex >= 0) {
+      insertIndex = position === "before" ? targetIndex : targetIndex + 1;
+    }
+  }
+
+  const nextTargetConversationIds = [...targetConversationIds];
+  nextTargetConversationIds.splice(insertIndex, 0, conversationId);
+
+  const sourceChanged =
+    sourceFolderId !== folderId &&
+    sourceFolderId &&
+    sourceConversationIds.some((currentConversationId) => currentConversationId === conversationId);
+  const targetChanged =
+    sourceFolderId !== folderId ||
+    nextTargetConversationIds.join("|") !== baseTargetConversationIds.join("|");
+
+  if (!sourceChanged && !targetChanged) {
+    return;
+  }
+
+  if (sourceFolderId && sourceFolderId !== folderId) {
+    setStoredFolderConversationIds(
+      sourceFolderId,
+      sourceConversationIds.filter((currentConversationId) => currentConversationId !== conversationId),
+    );
+  } else {
+    removeConversationFromFolderOrders(conversationId, folderId);
+  }
+
+  folderState.assignments[conversationId] = folderId;
+  setStoredFolderConversationIds(folderId, nextTargetConversationIds);
   persistFolderState();
   scheduleFolderRefresh();
   scheduleSettledFolderRefresh();
@@ -1017,7 +1477,7 @@ const refreshFolderLocalization = () => {
   }
 };
 
-const getDropZoneFromTarget = (target) => {
+const getConversationDropPlacementFromTarget = (target, clientY) => {
   if (!(target instanceof Element)) {
     return null;
   }
@@ -1033,29 +1493,45 @@ const getDropZoneFromTarget = (target) => {
       type: "ungrouped",
       key: "ungrouped",
       element: ungroupedButton,
+      highlightMode: "fill",
+    };
+  }
+
+  const conversationItem = getConversationItemFromTarget(target);
+  if (conversationItem instanceof HTMLAnchorElement) {
+    const folderId = conversationItem.getAttribute(FOLDER_ITEM_ATTR) || "";
+    if (!folderId) {
+      return {
+        type: "ungrouped",
+        key: "ungrouped",
+        element: conversationItem,
+        highlightMode: "fill",
+      };
+    }
+
+    const conversationId = getConversationIdFromItem(conversationItem);
+    if (!conversationId) {
+      return null;
+    }
+    if (conversationId === folderState.draggingConversationId) {
+      return null;
+    }
+
+    const rect = getVisibleRect(conversationItem);
+    const isBefore = rect ? clientY <= rect.top + rect.height / 2 : true;
+    return {
+      type: "folder",
+      key: `folder:${folderId}:${isBefore ? "before" : "after"}:${conversationId}`,
+      folderId,
+      targetConversationId: conversationId,
+      position: isBefore ? "before" : "after",
+      element: conversationItem,
+      highlightMode: isBefore ? "before" : "after",
     };
   }
 
   const dropZone = target.closest(`[${FOLDER_DROPZONE_ATTR}="folder"]`);
   if (!(dropZone instanceof HTMLElement) || dropZone.parentElement !== folderState.history) {
-    const folderConversationItem = target.closest(`a[${FOLDER_ITEM_ATTR}]`);
-    if (
-      folderConversationItem instanceof HTMLAnchorElement &&
-      folderConversationItem.parentElement === folderState.history
-    ) {
-      const folderIdFromItem = folderConversationItem.getAttribute(FOLDER_ITEM_ATTR) || "";
-      if (!folderIdFromItem) {
-        return null;
-      }
-
-      return {
-        type: "folder",
-        key: `folder:${folderIdFromItem}`,
-        folderId: folderIdFromItem,
-        element: folderConversationItem,
-      };
-    }
-
     return null;
   }
 
@@ -1064,15 +1540,36 @@ const getDropZoneFromTarget = (target) => {
     return null;
   }
 
+  if (dropZone.classList.contains(FOLDER_EMPTY_CLASS)) {
+    return {
+      type: "folder",
+      key: `folder:${folderId}:append`,
+      folderId,
+      targetConversationId: null,
+      position: "after",
+      element: dropZone,
+      highlightMode: "fill",
+    };
+  }
+
+  const layout = getFolderDragLayout("conversation");
+  const matchedZone = layout?.folderZones?.find((zone) => zone.folderId === folderId) || null;
+  if (matchedZone) {
+    return buildConversationDropPlacementFromFolderZone(matchedZone, clientY);
+  }
+
   return {
     type: "folder",
-    key: `folder:${folderId}`,
+    key: `folder:${folderId}:append`,
     folderId,
     element: dropZone,
+    targetConversationId: null,
+    position: "after",
+    highlightMode: "fill",
   };
 };
 
-const getDropZoneFromManagedArea = (clientX, clientY) => {
+const getConversationDropPlacementFromManagedArea = (clientX, clientY) => {
   if (!Number.isFinite(clientX) || !Number.isFinite(clientY)) {
     return null;
   }
@@ -1087,8 +1584,7 @@ const getDropZoneFromManagedArea = (clientX, clientY) => {
       type: "ungrouped",
       key: "ungrouped",
       element: layout.ungroupedButton,
-      indirect: true,
-      allowHighlight: true,
+      highlightMode: "fill",
     };
   }
 
@@ -1104,7 +1600,7 @@ const getDropZoneFromManagedArea = (clientX, clientY) => {
   const matchedFolderZone =
     layout.folderZones.find((zone) => clientY >= zone.top && clientY <= zone.bottom) || null;
   if (matchedFolderZone) {
-    return matchedFolderZone;
+    return buildConversationDropPlacementFromFolderZone(matchedFolderZone, clientY);
   }
 
   if (!layout.ungroupedRange) {
@@ -1119,18 +1615,17 @@ const getDropZoneFromManagedArea = (clientX, clientY) => {
     type: "ungrouped",
     key: "ungrouped",
     element: layout.ungroupedRange.element,
-    indirect: true,
-    allowHighlight: true,
+    highlightMode: "fill",
   };
 };
 
-const getDropZoneFromEvent = (event) => {
-  const directDropZone = getDropZoneFromTarget(getSafeEventTarget(event));
+const getConversationDropPlacementFromEvent = (event) => {
+  const directDropZone = getConversationDropPlacementFromTarget(getSafeEventTarget(event), event?.clientY);
   if (directDropZone) {
     return directDropZone;
   }
 
-  return getDropZoneFromManagedArea(event?.clientX, event?.clientY);
+  return getConversationDropPlacementFromManagedArea(event?.clientX, event?.clientY);
 };
 
 const getFolderSortPlacement = (clientX, clientY) => {
@@ -1253,6 +1748,10 @@ const renderFolders = () => {
     }
 
     ungroupedItems.push(item);
+  });
+
+  groupedItems.forEach((items, folderId) => {
+    groupedItems.set(folderId, orderConversationItemsForFolder(folderId, items));
   });
 
   const otherNativeChildren = Array.from(history.children).filter(
@@ -1506,7 +2005,7 @@ const handleFolderDragOver = (event) => {
     return;
   }
 
-  const dropZone = getDropZoneFromEvent(event);
+  const dropZone = getConversationDropPlacementFromEvent(event);
   if (!dropZone) {
     clearDropZoneHighlight();
     return;
@@ -1516,11 +2015,7 @@ const handleFolderDragOver = (event) => {
   if (event.dataTransfer) {
     event.dataTransfer.dropEffect = "move";
   }
-  if (dropZone.indirect && !dropZone.allowHighlight) {
-    clearDropZoneHighlight();
-    return;
-  }
-  setDropZoneHighlight(dropZone.element, dropZone.key);
+  setDropZoneHighlight(dropZone.element, dropZone.key, dropZone.highlightMode || "fill");
 };
 
 const handleFolderDrop = (event) => {
@@ -1543,7 +2038,7 @@ const handleFolderDrop = (event) => {
   }
 
   const conversationId = folderState.draggingConversationId;
-  const dropZone = getDropZoneFromEvent(event);
+  const dropZone = getConversationDropPlacementFromEvent(event);
   clearFolderDragState();
 
   if (!dropZone) {
@@ -1558,8 +2053,10 @@ const handleFolderDrop = (event) => {
   }
 
   if (dropZone.type === "folder" && dropZone.folderId) {
-    assignConversationToFolder(conversationId, dropZone.folderId);
-    scheduleSettledFolderRefresh();
+    moveConversationToFolderPosition(conversationId, dropZone.folderId, {
+      targetConversationId: dropZone.targetConversationId || null,
+      position: dropZone.position || "after",
+    });
   }
 };
 
