@@ -127,6 +127,13 @@ const clearCollapseMemoryAutoApplyTimer = () => {
   }
 };
 
+const clearCollapseMemoryReoptimizeTimer = () => {
+  if (collapseMemoryReoptimizeTimer) {
+    clearTimeout(collapseMemoryReoptimizeTimer);
+    collapseMemoryReoptimizeTimer = null;
+  }
+};
+
 const rememberConversationCollapseState = (conversationKey, now = Date.now()) => {
   if (!conversationKey) {
     return false;
@@ -168,6 +175,7 @@ const clearConversationCollapseMemory = (conversationKey) => {
     collapseMemoryState.pendingAutoConversationKey = "";
     clearCollapseMemoryAutoApplyTimer();
   }
+  clearCollapseMemoryReoptimizeTimer();
   persistCollapseMemory();
   if (conversationKey === state.conversationKey) {
     syncCollapseMemoryUi();
@@ -317,6 +325,46 @@ const scheduleAutoCollapseForConversation = (conversationKey) => {
   }, COLLAPSE_AUTO_APPLY_DELAY_MS);
 };
 
+const shouldAutoReoptimizeCurrentConversation = (conversationKey = state.conversationKey) => {
+  if (!conversationKey || !state.isCollapsed || !isConversationCollapseRemembered(conversationKey)) {
+    return false;
+  }
+
+  return getMessageNodes().length >= state.keepLatest + COLLAPSE_AUTO_REOPTIMIZE_BUFFER;
+};
+
+const attemptAutoReoptimizeCurrentConversation = () => {
+  collapseMemoryReoptimizeTimer = null;
+  ensureConversationState();
+  hydrateCollapseMemory();
+  pruneCollapseMemoryEntries();
+
+  const conversationKey = state.conversationKey;
+  if (!shouldAutoReoptimizeCurrentConversation(conversationKey)) {
+    return;
+  }
+
+  collapseOldMessages({
+    rememberState: true,
+    updateStatus: false,
+  });
+};
+
+const scheduleAutoReoptimizeCurrentConversation = () => {
+  if (!shouldAutoReoptimizeCurrentConversation()) {
+    clearCollapseMemoryReoptimizeTimer();
+    return;
+  }
+
+  if (collapseMemoryReoptimizeTimer) {
+    return;
+  }
+
+  collapseMemoryReoptimizeTimer = setTimeout(() => {
+    attemptAutoReoptimizeCurrentConversation();
+  }, COLLAPSE_AUTO_REOPTIMIZE_DELAY_MS);
+};
+
 const syncCollapseMemoryForCurrentConversation = (options = {}) => {
   const { triggerAuto = false, forceAuto = false } = options;
 
@@ -331,6 +379,7 @@ const syncCollapseMemoryForCurrentConversation = (options = {}) => {
     collapseMemoryState.currentConversationKey = conversationKey || "";
     collapseMemoryState.pendingAutoConversationKey = "";
     clearCollapseMemoryAutoApplyTimer();
+    clearCollapseMemoryReoptimizeTimer();
   }
 
   if (!conversationKey) {
@@ -353,6 +402,8 @@ const syncCollapseMemoryForCurrentConversation = (options = {}) => {
   if (shouldScheduleAuto) {
     scheduleAutoCollapseForConversation(conversationKey);
   }
+
+  scheduleAutoReoptimizeCurrentConversation();
 
   syncCollapseMemoryUi();
 };
@@ -429,10 +480,13 @@ const collapseOldMessages = (options = {}) => {
   state.anchorNode = firstKeptNode;
   state.anchorParent = firstKeptNode?.parentNode;
 
-  state.collapsedNodes = toCollapse.map((node) => ({
+  const nextCollapsedNodes = toCollapse.map((node) => ({
     node,
     parent: node.parentNode,
   }));
+  state.collapsedNodes = state.isCollapsed
+    ? state.collapsedNodes.concat(nextCollapsedNodes)
+    : nextCollapsedNodes;
 
   toCollapse.forEach((node) => node.remove());
 
@@ -540,6 +594,7 @@ const restoreMessages = (options = {}) => {
   state.anchorNode = null;
   state.anchorParent = null;
   state.isCollapsed = false;
+  clearCollapseMemoryReoptimizeTimer();
   if (updateStatus) {
     updateStatusByKey(
       memoryCleared ? "status.restoreDoneMemoryCleared" : "status.restoreDone",
