@@ -40,7 +40,9 @@ if (!window[TOOLKIT_BOOTSTRAP_FLAG]) {
 
   setupThemeSync();
   initFolders();
+  initCollapseMemory();
   attachToolbar();
+  syncCollapseMemoryForCurrentConversation({ triggerAuto: true, forceAuto: true });
   renderTimeline();
   setupResizeListener();
 
@@ -148,6 +150,10 @@ if (!window[TOOLKIT_BOOTSTRAP_FLAG]) {
       }
 
       observeThemeOnBodyIfNeeded();
+    }
+
+    if (needsPresenceCheck || needsTimelineRefresh) {
+      syncCollapseMemoryForCurrentConversation({ triggerAuto: true });
     }
 
     if (needsFolderRefresh) {

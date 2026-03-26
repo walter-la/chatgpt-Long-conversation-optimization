@@ -124,4 +124,58 @@ const loadFolderSnapshotFromExtension = () =>
     }
   });
 
+const saveCollapseMemorySnapshot = (snapshot) => {
+  try {
+    localStorage.setItem(COLLAPSE_MEMORY_LOCAL_FALLBACK_KEY, JSON.stringify(snapshot));
+  } catch (error) {
+    // Ignore storage write failures.
+  }
+
+  const storageArea = getExtensionStorageArea();
+  if (!storageArea) {
+    return;
+  }
+
+  try {
+    storageArea.set({ [COLLAPSE_MEMORY_STORAGE_KEY]: snapshot }, () => {
+      void chrome?.runtime?.lastError;
+    });
+  } catch (error) {
+    // Ignore storage write failures.
+  }
+};
+
+const loadCollapseMemorySnapshot = () => {
+  try {
+    const stored = localStorage.getItem(COLLAPSE_MEMORY_LOCAL_FALLBACK_KEY);
+    if (!stored) {
+      return null;
+    }
+    return JSON.parse(stored);
+  } catch (error) {
+    return null;
+  }
+};
+
+const loadCollapseMemorySnapshotFromExtension = () =>
+  new Promise((resolve) => {
+    const storageArea = getExtensionStorageArea();
+    if (!storageArea) {
+      resolve(null);
+      return;
+    }
+
+    try {
+      storageArea.get([COLLAPSE_MEMORY_STORAGE_KEY], (result) => {
+        if (chrome?.runtime?.lastError) {
+          resolve(null);
+          return;
+        }
+        resolve(result?.[COLLAPSE_MEMORY_STORAGE_KEY] || null);
+      });
+    } catch (error) {
+      resolve(null);
+    }
+  });
+
 

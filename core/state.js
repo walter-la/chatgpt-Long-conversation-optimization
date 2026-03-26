@@ -8,6 +8,9 @@ const POSITION_KEY = "chatgpt-toolkit-position";
 const LANGUAGE_PREFERENCE_KEY = "chatgpt-toolkit-language";
 const TIMELINE_POSITION_KEY = "chatgpt-toolkit-timeline-position";
 const TIMELINE_VISIBLE_KEY = "chatgpt-toolkit-timeline-visible";
+const COLLAPSE_MEMORY_STORAGE_KEY = "chatgpt-toolkit-collapse-memory-v1";
+const COLLAPSE_MEMORY_LOCAL_FALLBACK_KEY = "chatgpt-toolkit-collapse-memory-fallback";
+const COLLAPSE_MEMORY_RETENTION_MS = 10 * 24 * 60 * 60 * 1000;
 const THEME_ATTR = "data-toolkit-theme";
 const TIMELINE_ID = "chatgpt-conversation-toolkit-timeline";
 const TIMELINE_TRACK_ID = "chatgpt-conversation-toolkit-timeline-track";
@@ -97,12 +100,23 @@ const folderState = {
   refreshQueued: false,
   refreshPending: false,
 };
+const collapseMemoryState = {
+  initialized: false,
+  loaded: false,
+  entries: {},
+  currentConversationKey: "",
+  pendingAutoConversationKey: "",
+  recentOptionsConversationKey: "",
+  recentOptionsAt: 0,
+};
 let promptToastTimer = null;
 let timelineHintTimer = null;
 let timelineHighlightTimer = null;
 let timelineRefreshTimer = null;
 let folderHighlightTimer = null;
 let folderSettledRefreshTimer = null;
+let collapseMemoryAutoApplyTimer = null;
+let collapseMemoryArchiveCheckTimer = null;
 let timelineScrollTicking = false;
 let timelineScrollListenerAdded = false;
 let themeObserver = null;

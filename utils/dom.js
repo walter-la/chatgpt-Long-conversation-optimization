@@ -46,10 +46,12 @@ const resetConversationState = () => {
 
 const ensureConversationState = () => {
   const nextKey = getConversationKey();
-  if (state.conversationKey !== nextKey) {
+  const changed = state.conversationKey !== nextKey;
+  if (changed) {
     state.conversationKey = nextKey;
     resetConversationState();
   }
+  return changed;
 };
 
 const normalizeMessageNode = (node) =>

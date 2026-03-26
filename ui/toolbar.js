@@ -1,6 +1,9 @@
 /*
  * ChatGPT Conversation Toolkit - Toolbar and drag behavior
  */
+const TOOLKIT_REPO_URL = "https://github.com/bujue3709/chatgpt-Long-conversation-optimization";
+const TOOLKIT_FEEDBACK_URL = `${TOOLKIT_REPO_URL}/issues/new`;
+
 const getSnappedFloatingButtonPlacement = (left, top, width, height) => {
   const viewportWidth = window.innerWidth;
   const viewportHeight = window.innerHeight;
@@ -97,6 +100,36 @@ const refreshMinimizedButtonLocalization = () => {
   button.setAttribute("aria-label", t("toolbar.expandAria"));
 };
 
+const buildToolbarTickerMarkup = (text) =>
+  `<span class="chatgpt-toolkit-cta-track" aria-hidden="true">
+    <span class="chatgpt-toolkit-cta-line">${text}</span>
+    <span class="chatgpt-toolkit-cta-line">${text}</span>
+  </span>`;
+
+const refreshCollapseMemoryIndicator = () => {
+  const toolbar = document.getElementById(TOOLKIT_ID);
+  if (!(toolbar instanceof HTMLElement)) {
+    return;
+  }
+
+  const indicator = toolbar.querySelector(".chatgpt-toolkit-memory-indicator");
+  if (!(indicator instanceof HTMLElement)) {
+    return;
+  }
+
+  const remembered = Boolean(
+    state.conversationKey && typeof isConversationCollapseRemembered === "function"
+      ? isConversationCollapseRemembered(state.conversationKey)
+      : false,
+  );
+
+  indicator.textContent = t("toolbar.collapseMemoryBadge");
+  indicator.title = t("toolbar.collapseMemoryHint");
+  indicator.setAttribute("aria-label", t("toolbar.collapseMemoryHint"));
+  indicator.toggleAttribute("hidden", !remembered);
+  indicator.dataset.active = remembered ? "1" : "0";
+};
+
 const refreshToolbarLocalization = () => {
   const toolbar = document.getElementById(TOOLKIT_ID);
   if (!(toolbar instanceof HTMLElement)) {
@@ -113,6 +146,8 @@ const refreshToolbarLocalization = () => {
   if (subtitle instanceof HTMLElement) {
     subtitle.textContent = t("toolbar.subtitle");
   }
+
+  refreshCollapseMemoryIndicator();
 
   const minimizeButton = toolbar.querySelector('[data-action="minimize"]');
   if (minimizeButton instanceof HTMLButtonElement) {
@@ -180,6 +215,26 @@ const refreshToolbarLocalization = () => {
     tip.textContent = t("toolbar.tip");
   }
 
+  const starButton = toolbar.querySelector('[data-action="open-star-project"]');
+  if (starButton instanceof HTMLButtonElement) {
+    starButton.title = t("toolbar.starProjectAria");
+    starButton.setAttribute("aria-label", t("toolbar.starProjectAria"));
+    const viewport = starButton.querySelector(".chatgpt-toolkit-cta-viewport");
+    if (viewport instanceof HTMLElement) {
+      viewport.innerHTML = buildToolbarTickerMarkup(t("toolbar.starProject"));
+    }
+  }
+
+  const feedbackButton = toolbar.querySelector('[data-action="open-feedback"]');
+  if (feedbackButton instanceof HTMLButtonElement) {
+    feedbackButton.title = t("toolbar.feedbackAria");
+    feedbackButton.setAttribute("aria-label", t("toolbar.feedbackAria"));
+    const viewport = feedbackButton.querySelector(".chatgpt-toolkit-cta-viewport");
+    if (viewport instanceof HTMLElement) {
+      viewport.innerHTML = buildToolbarTickerMarkup(t("toolbar.feedback"));
+    }
+  }
+
   refreshStatusLocalization();
   refreshMinimizedButtonLocalization();
   updateSearchUI();
@@ -196,7 +251,12 @@ const buildToolbar = () => {
         ${t("toolbar.minimize")}
       </button>
       <div class="chatgpt-toolkit-header-meta">
-        <span class="chatgpt-toolkit-subtitle">${t("toolbar.subtitle")}</span>
+        <div class="chatgpt-toolkit-context">
+          <span class="chatgpt-toolkit-subtitle">${t("toolbar.subtitle")}</span>
+          <span class="chatgpt-toolkit-memory-indicator" hidden title="${t("toolbar.collapseMemoryHint")}" aria-label="${t("toolbar.collapseMemoryHint")}">
+            ${t("toolbar.collapseMemoryBadge")}
+          </span>
+        </div>
         <label class="chatgpt-toolkit-language" for="chatgpt-toolkit-language-select">
           <span class="chatgpt-toolkit-language-label">${t("language.label")}</span>
           <select id="chatgpt-toolkit-language-select" class="chatgpt-toolkit-language-select" aria-label="${t("language.label")}">
@@ -235,6 +295,18 @@ const buildToolbar = () => {
     </div>
     <p id="${STATUS_ID}" class="chatgpt-toolkit-status" data-tone="info">${t("toolbar.ready")}</p>
     <p class="chatgpt-toolkit-tip">${t("toolbar.tip")}</p>
+    <div class="chatgpt-toolkit-cta-row" aria-label="Project actions">
+      <button type="button" class="chatgpt-toolkit-cta-btn is-accent" data-action="open-star-project" title="${t("toolbar.starProjectAria")}" aria-label="${t("toolbar.starProjectAria")}">
+        <span class="chatgpt-toolkit-cta-viewport">
+          ${buildToolbarTickerMarkup(t("toolbar.starProject"))}
+        </span>
+      </button>
+      <button type="button" class="chatgpt-toolkit-cta-btn" data-action="open-feedback" title="${t("toolbar.feedbackAria")}" aria-label="${t("toolbar.feedbackAria")}">
+        <span class="chatgpt-toolkit-cta-viewport">
+          ${buildToolbarTickerMarkup(t("toolbar.feedback"))}
+        </span>
+      </button>
+    </div>
   `;
 
   container.addEventListener("click", (event) => {
@@ -261,6 +333,8 @@ const buildToolbar = () => {
       export: () => exportMessages(),
       "prompt-library": () => void openPromptModal(),
       "timeline-toggle": () => toggleTimelineVisibility(),
+      "open-star-project": () => openToolkitLink(TOOLKIT_REPO_URL),
+      "open-feedback": () => openToolkitLink(TOOLKIT_FEEDBACK_URL),
       search: () => {
         const input = document.getElementById('chatgpt-toolkit-search-input');
         if (input) performSearch(input.value);
@@ -562,7 +636,15 @@ const attachToolbar = () => {
   updateTimelineToggleButton();
   ensureMinimizedButton();
   refreshToolbarLocalization();
+  refreshCollapseMemoryIndicator();
   syncToolkitTheme();
+};
+
+const openToolkitLink = (url) => {
+  if (!url) {
+    return;
+  }
+  window.open(url, "_blank", "noopener,noreferrer");
 };
 
 // 标志位：避免重复添加 resize 监听器
