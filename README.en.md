@@ -13,7 +13,7 @@ Current active maintainer: `bujue3709` (primary / sole active maintainer)
 
 ## Feature Highlights
 
-- Long conversation cleanup: hide older messages and keep only the latest part of the conversation visible.
+- Long conversation cleanup: hide older messages, keep only the latest part visible, remember auto-optimization per conversation, and re-optimize automatically as the visible message count grows.
 - Full JSON export: export the current conversation even if older messages were previously collapsed.
 - In-page search: search within the current conversation, highlight matches, and jump between results.
 - Prompt library: add, delete, search, categorize, sort, import JSON, export JSON, and copy prompts with one click.
@@ -67,6 +67,11 @@ Available actions:
 
 When collapsed, the toolbar becomes a floating button. The button can be dragged and snaps to the nearest edge when released.
 
+The toolbar footer also includes two lightweight links:
+
+- `Like it? Star the project ✨`
+- `I have an optimization idea to share!`
+
 ### Language Support
 
 - On startup, the extension checks the user’s browser language and tries to match it against the built-in UI languages.
@@ -83,7 +88,12 @@ When collapsed, the toolbar becomes a floating button. The button can be dragged
 ### Long Conversation Cleanup
 
 - “Optimize long conversations” hides older messages and keeps the latest `20` visible.
+- Once a conversation is optimized manually, the extension remembers that conversation and auto-optimizes it again the next time you open it.
+- Remembered conversations show a small indicator in the toolbar header so the current auto-optimization state is visible.
+- If an already optimized conversation grows to `keepLatest + 10` visible messages, the extension automatically runs cleanup again and reduces the visible message count back to `keepLatest`.
 - “Restore hidden messages” puts hidden messages back into the page.
+- “Restore hidden messages” also clears the remembered auto-optimization state for the current conversation.
+- Remembered state is cleared if the conversation is not opened again within `10` days, or if that conversation is archived.
 - The restore flow tries to preserve reading position instead of jumping the page back to the top.
 
 ### Export
@@ -192,7 +202,7 @@ manifest.json
 - [ui/toolbar.js](./ui/toolbar.js)
   Floating toolbar, minimize button, and related drag interactions.
 - [features/collapse.js](./features/collapse.js)
-  Long-conversation collapse and restore behavior.
+  Long-conversation collapse and restore behavior, per-conversation auto-optimization memory, and continuous re-optimization.
 - [features/export.js](./features/export.js)
   Conversation export.
 - [features/folders.js](./features/folders.js)
@@ -217,6 +227,7 @@ Example:
 ```js
 const TIMELINE_VISIBLE_NODE_CAPACITY = 10;
 const TIMELINE_MAX_NODES = 20;
+const COLLAPSE_AUTO_REOPTIMIZE_BUFFER = 10;
 
 const state = {
   isCollapsed: false,
@@ -230,6 +241,7 @@ const state = {
 Key fields:
 
 - `keepLatest`: how many latest messages remain visible after long-conversation cleanup
+- `COLLAPSE_AUTO_REOPTIMIZE_BUFFER`: how many additional visible messages are allowed before an already optimized conversation is automatically collapsed again
 - `TIMELINE_VISIBLE_NODE_CAPACITY`: approximate number of timeline nodes visible in one screenful
 - `TIMELINE_MAX_NODES`: maximum sampled timeline node count
 
