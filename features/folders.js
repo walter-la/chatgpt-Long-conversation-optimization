@@ -8,6 +8,7 @@ const FOLDER_THEME_TARGET_ATTR = "data-toolkit-theme-target";
 const FOLDER_DROPZONE_ATTR = "data-toolkit-folder-dropzone";
 const FOLDER_BOUND_ATTR = "data-toolkit-folder-bound";
 const FOLDER_MANAGER_BOUND_ATTR = "data-toolkit-folder-manager-bound";
+const FOLDER_NATIVE_LIST_ATTR = "data-toolkit-folder-native-list";
 const FOLDER_HEADER_CLASS = "chatgpt-toolkit-folder-header";
 const FOLDER_EMPTY_CLASS = "chatgpt-toolkit-folder-empty";
 const FOLDER_DRAGGING_ATTR = "data-toolkit-folder-dragging";
@@ -266,11 +267,87 @@ const findChatHistorySection = () => {
 };
 
 const getConversationItems = (history) =>
-  Array.from(history.children).filter(
-    (child) =>
-      child instanceof HTMLAnchorElement &&
-      child.matches('[data-sidebar-item="true"][href*="/c/"]'),
+  !(history instanceof HTMLElement)
+    ? []
+    : Array.from(history.querySelectorAll('a[data-sidebar-item="true"][href*="/c/"]')).filter((item) => {
+        if (!(item instanceof HTMLAnchorElement) || !history.contains(item)) {
+          return false;
+        }
+        return getConversationPresentationNode(item, history) instanceof HTMLElement;
+      });
+
+const getNativeConversationList = (history) => {
+  if (!(history instanceof HTMLElement)) {
+    return null;
+  }
+
+  return (
+    Array.from(history.children).find((child) => {
+      if (
+        !(child instanceof HTMLElement) ||
+        child.classList.contains(FOLDER_HEADER_CLASS) ||
+        child.classList.contains(FOLDER_EMPTY_CLASS)
+      ) {
+        return false;
+      }
+      return child.querySelector('a[data-sidebar-item="true"][href*="/c/"]') instanceof HTMLAnchorElement;
+    }) || null
   );
+};
+
+const getConversationPresentationNode = (item, history = folderState.history) => {
+  if (!(item instanceof HTMLAnchorElement) || !(history instanceof HTMLElement) || !history.contains(item)) {
+    return null;
+  }
+
+  const nativeList = getNativeConversationList(history);
+  if (nativeList instanceof HTMLElement && nativeList.contains(item)) {
+    let node = item;
+    while (node instanceof HTMLElement && node.parentElement !== nativeList) {
+      node = node.parentElement;
+    }
+    if (node instanceof HTMLElement && node.parentElement === nativeList) {
+      return node;
+    }
+  }
+
+  return item.parentElement === history ? item : null;
+};
+
+const getConversationAnchorFromNode = (node, history = folderState.history) => {
+  if (!(node instanceof HTMLElement) || !(history instanceof HTMLElement)) {
+    return null;
+  }
+
+  if (node instanceof HTMLAnchorElement) {
+    return getConversationPresentationNode(node, history) instanceof HTMLElement ? node : null;
+  }
+
+  const item =
+    node.querySelector(':scope > a[data-sidebar-item="true"][href*="/c/"]') ||
+    node.querySelector('a[data-sidebar-item="true"][href*="/c/"]');
+  if (!(item instanceof HTMLAnchorElement)) {
+    return null;
+  }
+
+  return getConversationPresentationNode(item, history) === node ? item : null;
+};
+
+const getConversationFolderId = (item) => {
+  if (!(item instanceof HTMLElement)) {
+    return "";
+  }
+
+  const presentationNode = getConversationPresentationNode(item);
+  return (
+    presentationNode?.getAttribute(FOLDER_ITEM_ATTR) ||
+    item.getAttribute(FOLDER_ITEM_ATTR) ||
+    ""
+  );
+};
+
+const isConversationPresentationNode = (node, history = folderState.history) =>
+  getConversationAnchorFromNode(node, history) instanceof HTMLAnchorElement;
 
 const getConversationItemFromTarget = (target) => {
   if (!(target instanceof Element) || !(folderState.history instanceof HTMLElement)) {
@@ -278,7 +355,11 @@ const getConversationItemFromTarget = (target) => {
   }
 
   const item = target.closest('a[data-sidebar-item="true"][href*="/c/"]');
-  if (!(item instanceof HTMLAnchorElement) || item.parentElement !== folderState.history) {
+  if (
+    !(item instanceof HTMLAnchorElement) ||
+    !folderState.history.contains(item) ||
+    !(getConversationPresentationNode(item) instanceof HTMLElement)
+  ) {
     return null;
   }
 
@@ -317,6 +398,42 @@ const getFolderHistoryChildren = () =>
   !(folderState.history instanceof HTMLElement)
     ? []
     : Array.from(folderState.history.children).filter((child) => child instanceof HTMLElement);
+
+const getFolderFlowNodes = () => {
+  if (!(folderState.history instanceof HTMLElement)) {
+    return [];
+  }
+
+  const nativeList = getNativeConversationList(folderState.history);
+  const directChildren = getFolderHistoryChildren().filter((child) => child !== nativeList);
+  const conversationNodes = [];
+  const seenNodes = new Set();
+
+  getConversationItems(folderState.history).forEach((item) => {
+    const node = getConversationPresentationNode(item, folderState.history);
+    if (!(node instanceof HTMLElement) || seenNodes.has(node)) {
+      return;
+    }
+    seenNodes.add(node);
+    conversationNodes.push(node);
+  });
+
+  return [...directChildren, ...conversationNodes].sort((left, right) => {
+    const leftOrder = Number(left.style.order);
+    const rightOrder = Number(right.style.order);
+    const normalizedLeftOrder = Number.isFinite(leftOrder) ? leftOrder : Number.MAX_SAFE_INTEGER;
+    const normalizedRightOrder = Number.isFinite(rightOrder) ? rightOrder : Number.MAX_SAFE_INTEGER;
+    if (normalizedLeftOrder !== normalizedRightOrder) {
+      return normalizedLeftOrder - normalizedRightOrder;
+    }
+
+    if (left === right) {
+      return 0;
+    }
+
+    return left.compareDocumentPosition(right) & Node.DOCUMENT_POSITION_FOLLOWING ? -1 : 1;
+  });
+};
 
 const isPointInsideRect = (clientX, clientY, rect, padding = 0) => {
   if (!rect || !Number.isFinite(clientX) || !Number.isFinite(clientY)) {
@@ -406,10 +523,11 @@ const getCurrentFolderConversationIds = (folderId) => {
     getConversationItems(folderState.history)
       .map((item, index) => {
         const conversationId = getConversationIdFromItem(item);
-        const orderValue = Number(item.style.order);
+        const presentationNode = getConversationPresentationNode(item, folderState.history);
+        const orderValue = Number(presentationNode?.style.order);
         return {
           conversationId,
-          item,
+          item: presentationNode || item,
           index,
           order: Number.isFinite(orderValue) ? orderValue : Number.MAX_SAFE_INTEGER,
         };
@@ -694,17 +812,17 @@ const buildConversationDropLayout = () => {
   }
 
   const historyRect = folderState.history.getBoundingClientRect();
-  const historyChildren = getFolderHistoryChildren();
+  const flowNodes = getFolderFlowNodes();
   const sortedFolders = getSortedFolders();
-  const firstUngroupedItem = historyChildren.find(
-    (child) => child instanceof HTMLAnchorElement && !child.hasAttribute(FOLDER_ITEM_ATTR),
+  const firstUngroupedItem = flowNodes.find(
+    (child) => isConversationPresentationNode(child, folderState.history) && !child.hasAttribute(FOLDER_ITEM_ATTR),
   );
   const firstUngroupedRect = getVisibleRect(firstUngroupedItem);
   const fallbackBottomBoundary = firstUngroupedRect ? firstUngroupedRect.top : historyRect.bottom;
 
   const folderZones = sortedFolders
     .map((folder, index) => {
-      const header = historyChildren.find(
+      const header = flowNodes.find(
         (child) =>
           child.classList.contains(FOLDER_HEADER_CLASS) &&
           child.dataset.folderId === folder.id,
@@ -713,16 +831,16 @@ const buildConversationDropLayout = () => {
         return null;
       }
 
-      const emptyState = historyChildren.find(
+      const emptyState = flowNodes.find(
         (child) =>
           child.classList.contains(FOLDER_EMPTY_CLASS) &&
           child.dataset.folderId === folder.id,
       );
-      const itemPlacements = historyChildren
+      const itemPlacements = flowNodes
         .filter(
           (child) => {
             if (
-              !(child instanceof HTMLAnchorElement) ||
+              !isConversationPresentationNode(child, folderState.history) ||
               child.getAttribute(FOLDER_ITEM_ATTR) !== folder.id ||
               child.hasAttribute(FOLDER_COLLAPSED_ATTR)
             ) {
@@ -749,7 +867,7 @@ const buildConversationDropLayout = () => {
         })
         .filter(Boolean);
 
-      const segmentNodes = historyChildren.filter((child) => {
+      const segmentNodes = flowNodes.filter((child) => {
         if (!(child instanceof HTMLElement)) {
           return false;
         }
@@ -763,7 +881,7 @@ const buildConversationDropLayout = () => {
         }
 
         if (
-          !(child instanceof HTMLAnchorElement) ||
+          !isConversationPresentationNode(child, folderState.history) ||
           child.getAttribute(FOLDER_ITEM_ATTR) !== folder.id ||
           child.hasAttribute(FOLDER_COLLAPSED_ATTR)
         ) {
@@ -781,7 +899,7 @@ const buildConversationDropLayout = () => {
 
       let nextBoundaryTop = fallbackBottomBoundary;
       for (let cursor = index + 1; cursor < sortedFolders.length; cursor += 1) {
-        const nextHeader = historyChildren.find(
+        const nextHeader = flowNodes.find(
           (child) =>
             child.classList.contains(FOLDER_HEADER_CLASS) &&
             child.dataset.folderId === sortedFolders[cursor].id,
@@ -812,8 +930,8 @@ const buildConversationDropLayout = () => {
     })
     .filter(Boolean);
 
-  const ungroupedItems = historyChildren.filter(
-    (child) => child instanceof HTMLAnchorElement && !child.hasAttribute(FOLDER_ITEM_ATTR),
+  const ungroupedItems = flowNodes.filter(
+    (child) => isConversationPresentationNode(child, folderState.history) && !child.hasAttribute(FOLDER_ITEM_ATTR),
   );
   const ungroupedRects = ungroupedItems.map((node) => getVisibleRect(node)).filter(Boolean);
   const ungroupedRange =
@@ -924,11 +1042,11 @@ const buildFolderSortLayout = () => {
   }
 
   const historyRect = folderState.history.getBoundingClientRect();
-  const historyChildren = getFolderHistoryChildren();
+  const flowNodes = getFolderFlowNodes();
   const segments = getSortedFolders()
     .filter((folder) => folder.id !== folderState.draggingFolderId)
     .map((folder) => {
-      const header = historyChildren.find(
+      const header = flowNodes.find(
         (child) =>
           child.classList.contains(FOLDER_HEADER_CLASS) &&
           child.dataset.folderId === folder.id,
@@ -937,7 +1055,7 @@ const buildFolderSortLayout = () => {
         return null;
       }
 
-      const segmentNodes = historyChildren.filter((child) => {
+      const segmentNodes = flowNodes.filter((child) => {
         if (!(child instanceof HTMLElement)) {
           return false;
         }
@@ -950,7 +1068,7 @@ const buildFolderSortLayout = () => {
           return true;
         }
 
-        return child instanceof HTMLAnchorElement && child.getAttribute(FOLDER_ITEM_ATTR) === folder.id;
+        return isConversationPresentationNode(child, folderState.history) && child.getAttribute(FOLDER_ITEM_ATTR) === folder.id;
       });
 
       const segmentRects = segmentNodes.map((node) => getVisibleRect(node)).filter(Boolean);
@@ -1067,9 +1185,17 @@ const flashUngroupedConversations = (items) => {
     folderHighlightTimer = null;
   }
 
-  items.forEach((item) => item.setAttribute(FOLDER_HIGHLIGHT_ATTR, "1"));
+  const highlightNodes = Array.from(
+    new Set(
+      items
+        .map((item) => getConversationPresentationNode(item, folderState.history) || item)
+        .filter((item) => item instanceof HTMLElement),
+    ),
+  );
+
+  highlightNodes.forEach((item) => item.setAttribute(FOLDER_HIGHLIGHT_ATTR, "1"));
   folderHighlightTimer = setTimeout(() => {
-    items.forEach((item) => item.removeAttribute(FOLDER_HIGHLIGHT_ATTR));
+    highlightNodes.forEach((item) => item.removeAttribute(FOLDER_HIGHLIGHT_ATTR));
     folderHighlightTimer = null;
   }, 1200);
 };
@@ -1338,9 +1464,11 @@ const clearHistoryPresentation = (history) => {
     return;
   }
 
+  const nativeList = getNativeConversationList(history);
   history.removeAttribute(FOLDER_ROOT_ATTR);
   history.removeAttribute(FOLDER_THEME_TARGET_ATTR);
   history.removeAttribute(THEME_ATTR);
+  nativeList?.removeAttribute(FOLDER_NATIVE_LIST_ATTR);
 
   Array.from(history.children).forEach((child) => {
     if (!(child instanceof HTMLElement)) {
@@ -1356,6 +1484,23 @@ const clearHistoryPresentation = (history) => {
     child.removeAttribute(FOLDER_ITEM_ATTR);
     child.removeAttribute(FOLDER_COLLAPSED_ATTR);
     child.removeAttribute(FOLDER_HIGHLIGHT_ATTR);
+  });
+
+  getConversationItems(history).forEach((item) => {
+    const presentationNode = getConversationPresentationNode(item, history);
+    item.style.order = "";
+    item.removeAttribute(FOLDER_ITEM_ATTR);
+    item.removeAttribute(FOLDER_COLLAPSED_ATTR);
+    item.removeAttribute(FOLDER_HIGHLIGHT_ATTR);
+
+    if (!(presentationNode instanceof HTMLElement) || presentationNode === item) {
+      return;
+    }
+
+    presentationNode.style.order = "";
+    presentationNode.removeAttribute(FOLDER_ITEM_ATTR);
+    presentationNode.removeAttribute(FOLDER_COLLAPSED_ATTR);
+    presentationNode.removeAttribute(FOLDER_HIGHLIGHT_ATTR);
   });
 };
 
@@ -1375,6 +1520,7 @@ const cleanupFolderUi = () => {
   folderState.section = null;
   folderState.headerButton = null;
   folderState.history = null;
+  folderState.nativeList = null;
   folderState.menuFolderId = null;
   folderState.currentDropZoneKey = "";
 };
@@ -1499,12 +1645,17 @@ const getConversationDropPlacementFromTarget = (target, clientY) => {
 
   const conversationItem = getConversationItemFromTarget(target);
   if (conversationItem instanceof HTMLAnchorElement) {
-    const folderId = conversationItem.getAttribute(FOLDER_ITEM_ATTR) || "";
+    const presentationNode = getConversationPresentationNode(conversationItem, folderState.history);
+    if (!(presentationNode instanceof HTMLElement)) {
+      return null;
+    }
+
+    const folderId = getConversationFolderId(conversationItem);
     if (!folderId) {
       return {
         type: "ungrouped",
         key: "ungrouped",
-        element: conversationItem,
+        element: presentationNode,
         highlightMode: "fill",
       };
     }
@@ -1517,7 +1668,7 @@ const getConversationDropPlacementFromTarget = (target, clientY) => {
       return null;
     }
 
-    const rect = getVisibleRect(conversationItem);
+    const rect = getVisibleRect(presentationNode);
     const isBefore = rect ? clientY <= rect.top + rect.height / 2 : true;
     return {
       type: "folder",
@@ -1525,7 +1676,7 @@ const getConversationDropPlacementFromTarget = (target, clientY) => {
       folderId,
       targetConversationId: conversationId,
       position: isBefore ? "before" : "after",
-      element: conversationItem,
+      element: presentationNode,
       highlightMode: isBefore ? "before" : "after",
     };
   }
@@ -1718,24 +1869,32 @@ const syncConversationItemPresentation = (item, plan) => {
     return;
   }
 
-  applyFolderNodeOrder(item, plan.order);
+  const presentationNode = getConversationPresentationNode(item, folderState.history) || item;
+  applyFolderNodeOrder(presentationNode, plan.order);
 
-  const currentFolderId = item.getAttribute(FOLDER_ITEM_ATTR) || "";
-  if (plan.folderId) {
-    if (currentFolderId !== plan.folderId) {
-      item.setAttribute(FOLDER_ITEM_ATTR, plan.folderId);
-    }
-  } else if (currentFolderId) {
+  if (presentationNode !== item) {
+    item.style.order = "";
     item.removeAttribute(FOLDER_ITEM_ATTR);
+    item.removeAttribute(FOLDER_COLLAPSED_ATTR);
+    item.removeAttribute(FOLDER_HIGHLIGHT_ATTR);
   }
 
-  const isCollapsed = item.hasAttribute(FOLDER_COLLAPSED_ATTR);
+  const currentFolderId = presentationNode.getAttribute(FOLDER_ITEM_ATTR) || "";
+  if (plan.folderId) {
+    if (currentFolderId !== plan.folderId) {
+      presentationNode.setAttribute(FOLDER_ITEM_ATTR, plan.folderId);
+    }
+  } else if (currentFolderId) {
+    presentationNode.removeAttribute(FOLDER_ITEM_ATTR);
+  }
+
+  const isCollapsed = presentationNode.hasAttribute(FOLDER_COLLAPSED_ATTR);
   if (plan.collapsed) {
     if (!isCollapsed) {
-      item.setAttribute(FOLDER_COLLAPSED_ATTR, "1");
+      presentationNode.setAttribute(FOLDER_COLLAPSED_ATTR, "1");
     }
   } else if (isCollapsed) {
-    item.removeAttribute(FOLDER_COLLAPSED_ATTR);
+    presentationNode.removeAttribute(FOLDER_COLLAPSED_ATTR);
   }
 };
 
@@ -1834,13 +1993,18 @@ const renderFolders = () => {
   folderState.section = section;
   folderState.headerButton = headerButton;
   folderState.history = history;
+  folderState.nativeList = getNativeConversationList(history);
 
   bindFolderHistoryEvents(history);
   const manager = ensureFolderManager(section, headerButton);
   ensureFolderMenu();
 
   const conversationItems = getConversationItems(history);
-  const conversationItemSet = new Set(conversationItems);
+  const conversationPresentationSet = new Set(
+    conversationItems
+      .map((item) => getConversationPresentationNode(item, history))
+      .filter((item) => item instanceof HTMLElement),
+  );
   const sortedFolders = getSortedFolders();
   const validFolderIds = new Set(sortedFolders.map((folder) => folder.id));
   const groupedItems = new Map();
@@ -1868,9 +2032,10 @@ const renderFolders = () => {
   const otherNativeChildren = Array.from(history.children).filter(
     (child) =>
       child instanceof HTMLElement &&
+      child !== folderState.nativeList &&
       !child.classList.contains(FOLDER_HEADER_CLASS) &&
       !child.classList.contains(FOLDER_EMPTY_CLASS) &&
-      !conversationItemSet.has(child),
+      !conversationPresentationSet.has(child),
   );
 
   const conversationPlans = new Map();
@@ -1920,6 +2085,17 @@ const renderFolders = () => {
     }
     if (history.getAttribute(FOLDER_THEME_TARGET_ATTR) !== "folders") {
       history.setAttribute(FOLDER_THEME_TARGET_ATTR, "folders");
+    }
+    Array.from(history.children).forEach((child) => {
+      if (!(child instanceof HTMLElement) || child === folderState.nativeList) {
+        return;
+      }
+      child.removeAttribute(FOLDER_NATIVE_LIST_ATTR);
+    });
+    if (folderState.nativeList instanceof HTMLElement) {
+      if (folderState.nativeList.getAttribute(FOLDER_NATIVE_LIST_ATTR) !== "1") {
+        folderState.nativeList.setAttribute(FOLDER_NATIVE_LIST_ATTR, "1");
+      }
     }
 
     const currentHeaders = new Map();

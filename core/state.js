@@ -93,6 +93,7 @@ const folderState = {
   section: null,
   headerButton: null,
   history: null,
+  nativeList: null,
   menuFolderId: null,
   draggingConversationId: null,
   draggingFolderId: null,
