@@ -43,7 +43,6 @@ const state = {
   isMinimized: false,
   keepLatest: 20,
   collapsedNodes: [],
-  cachedNodes: [],
   conversationKey: null,
   anchorNode: null,
   anchorParent: null,

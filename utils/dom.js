@@ -23,7 +23,6 @@ const getConversationKey = () => {
 const resetConversationState = () => {
   state.isCollapsed = false;
   state.collapsedNodes = [];
-  state.cachedNodes = [];
   state.anchorNode = null;
   state.anchorParent = null;
   state.searchQuery = '';

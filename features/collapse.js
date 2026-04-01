@@ -472,7 +472,6 @@ const collapseOldMessages = (options = {}) => {
     return false;
   }
 
-  state.cachedNodes = nodes;
   const toCollapse = nodes.slice(0, nodes.length - state.keepLatest);
 
   // 记录第一个保留的节点作为锚点
