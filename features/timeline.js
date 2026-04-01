@@ -4,6 +4,7 @@
 // ============ 时间线功能 ============
 
 let timelineBoundScrollRoot = null;
+let timelineWindowScrollBound = false;
 
 const getTimelineElements = () => {
   const timeline = document.getElementById(TIMELINE_ID);
@@ -612,6 +613,9 @@ const syncTimelineActiveFromViewport = () => {
 };
 
 const onTimelineWindowScroll = () => {
+  if (!timelineState.visible) {
+    return;
+  }
   if (isTimelineInteractionLocked()) {
     return;
   }
@@ -627,6 +631,11 @@ const onTimelineWindowScroll = () => {
     }
   });
 };
+
+const isDocumentLikeScrollRoot = (root) =>
+  root === document.scrollingElement ||
+  root === document.documentElement ||
+  root === document.body;
 
 const resolveTimelineScrollRoot = () => {
   const explicitRoot = document.querySelector("[data-scroll-root]");
@@ -1037,18 +1046,31 @@ const clearTimelineRefreshTimer = () => {
 const setTimelineScrollListenerEnabled = (enabled) => {
   if (enabled) {
     const nextRoot = resolveTimelineScrollRoot();
-    if (!timelineScrollListenerAdded) {
-      window.addEventListener("scroll", onTimelineWindowScroll, { passive: true });
-      document.addEventListener("scroll", onTimelineWindowScroll, { passive: true, capture: true });
-      timelineScrollListenerAdded = true;
-    }
     if (timelineBoundScrollRoot && timelineBoundScrollRoot !== nextRoot) {
       timelineBoundScrollRoot.removeEventListener("scroll", onTimelineWindowScroll);
+      timelineBoundScrollRoot = null;
     }
-    if (nextRoot && timelineBoundScrollRoot !== nextRoot) {
+
+    const bindWindowFallback =
+      !(nextRoot instanceof HTMLElement) || isDocumentLikeScrollRoot(nextRoot);
+
+    if (!bindWindowFallback && nextRoot instanceof HTMLElement && timelineBoundScrollRoot !== nextRoot) {
       nextRoot.addEventListener("scroll", onTimelineWindowScroll, { passive: true });
+      timelineBoundScrollRoot = nextRoot;
+    } else if (bindWindowFallback && timelineBoundScrollRoot) {
+      timelineBoundScrollRoot.removeEventListener("scroll", onTimelineWindowScroll);
+      timelineBoundScrollRoot = null;
     }
-    timelineBoundScrollRoot = nextRoot;
+
+    if (bindWindowFallback && !timelineWindowScrollBound) {
+      window.addEventListener("scroll", onTimelineWindowScroll, { passive: true });
+      timelineWindowScrollBound = true;
+    } else if (!bindWindowFallback && timelineWindowScrollBound) {
+      window.removeEventListener("scroll", onTimelineWindowScroll);
+      timelineWindowScrollBound = false;
+    }
+
+    timelineScrollListenerAdded = timelineWindowScrollBound || timelineBoundScrollRoot instanceof HTMLElement;
     return;
   }
 
@@ -1057,12 +1079,18 @@ const setTimelineScrollListenerEnabled = (enabled) => {
       timelineBoundScrollRoot.removeEventListener("scroll", onTimelineWindowScroll);
       timelineBoundScrollRoot = null;
     }
+    if (timelineWindowScrollBound) {
+      window.removeEventListener("scroll", onTimelineWindowScroll);
+      timelineWindowScrollBound = false;
+    }
     timelineScrollListenerAdded = false;
     return;
   }
 
-  window.removeEventListener("scroll", onTimelineWindowScroll);
-  document.removeEventListener("scroll", onTimelineWindowScroll, true);
+  if (timelineWindowScrollBound) {
+    window.removeEventListener("scroll", onTimelineWindowScroll);
+    timelineWindowScrollBound = false;
+  }
   if (timelineBoundScrollRoot) {
     timelineBoundScrollRoot.removeEventListener("scroll", onTimelineWindowScroll);
     timelineBoundScrollRoot = null;
