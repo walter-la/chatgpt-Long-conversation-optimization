@@ -720,6 +720,9 @@ const syncTimelineActiveFromViewport = () => {
 };
 
 const onTimelineWindowScroll = () => {
+  if (document.hidden || document.visibilityState === "hidden") {
+    return;
+  }
   if (!timelineState.visible) {
     return;
   }
@@ -1154,6 +1157,10 @@ const clearTimelineRefreshTimer = () => {
 };
 
 const setTimelineScrollListenerEnabled = (enabled) => {
+  if (enabled && (document.hidden || document.visibilityState === "hidden")) {
+    enabled = false;
+  }
+
   if (enabled) {
     const nextRoot = resolveTimelineScrollRoot();
     if (timelineBoundScrollRoot && timelineBoundScrollRoot !== nextRoot) {
@@ -1412,6 +1419,11 @@ const ensureTimeline = () => {
 
 const renderTimeline = () => {
   updateTimelineToggleButton();
+  if (document.hidden || document.visibilityState === "hidden") {
+    markTimelineRefreshPending();
+    setTimelineScrollListenerEnabled(false);
+    return;
+  }
   if (!timelineState.visible) {
     destroyTimeline();
     return;
@@ -1534,6 +1546,11 @@ const renderTimeline = () => {
 };
 
 const scheduleTimelineRefresh = () => {
+  if (document.hidden || document.visibilityState === "hidden") {
+    clearTimelineRefreshTimer();
+    markTimelineRefreshPending();
+    return;
+  }
   if (!timelineState.visible) {
     clearTimelineRefreshTimer();
     return;

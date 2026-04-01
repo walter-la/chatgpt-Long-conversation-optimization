@@ -78,7 +78,7 @@ const timelineState = {
   signature: "",
   contentHeight: 0,
   rendered: false,
-  visible: true,
+  visible: false,
   manualPosition: null,
   pointerDown: false,
   dragging: false,

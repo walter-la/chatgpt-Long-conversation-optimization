@@ -21,6 +21,8 @@ if (!window[TOOLKIT_BOOTSTRAP_FLAG]) {
   let refreshNeedsTimeline = false;
   let refreshNeedsTimelinePosition = false;
   let refreshNeedsCloseFolderMenu = false;
+  const isToolkitPageVisible = () =>
+    document.visibilityState !== "hidden" && !document.hidden;
 
   const queueUiRefreshDispatch = ({
     folderRefresh = false,
@@ -41,12 +43,20 @@ if (!window[TOOLKIT_BOOTSTRAP_FLAG]) {
       refreshNeedsCloseFolderMenu = true;
     }
 
+    if (!isToolkitPageVisible()) {
+      return;
+    }
+
     if (refreshDispatchRafId) {
       return;
     }
 
     refreshDispatchRafId = requestAnimationFrame(() => {
       refreshDispatchRafId = 0;
+      if (!isToolkitPageVisible()) {
+        return;
+      }
+
       const needsFolder = refreshNeedsFolder;
       const needsTimeline = refreshNeedsTimeline;
       const needsTimelinePosition = refreshNeedsTimelinePosition;
@@ -168,11 +178,18 @@ if (!window[TOOLKIT_BOOTSTRAP_FLAG]) {
     });
 
   const queueObserverCallback = () => {
+    if (!isToolkitPageVisible()) {
+      return;
+    }
     if (observerRafId) {
       return;
     }
     observerRafId = requestAnimationFrame(() => {
       observerRafId = 0;
+      if (!isToolkitPageVisible()) {
+        return;
+      }
+
       const needsPresenceCheck = observerNeedsPresenceCheck;
       const needsConversationSync = observerNeedsConversationSync;
       const needsTimelineRefresh = observerNeedsTimelineRefresh;
@@ -332,6 +349,19 @@ if (!window[TOOLKIT_BOOTSTRAP_FLAG]) {
     observedSidebarRoot = null;
   };
 
+  const pauseScopedObserversForHidden = () => {
+    if (observerRootSyncTimer) {
+      clearTimeout(observerRootSyncTimer);
+      observerRootSyncTimer = 0;
+    }
+    if (observerRafId) {
+      cancelAnimationFrame(observerRafId);
+      observerRafId = 0;
+    }
+    disconnectConversationObserver();
+    disconnectSidebarObserver();
+  };
+
   const getConversationMutationElements = (mutation) => {
     const elements = [];
     const targetElement = getObservedElement(mutation?.target);
@@ -366,6 +396,9 @@ if (!window[TOOLKIT_BOOTSTRAP_FLAG]) {
     );
 
   const handleConversationMutations = (mutations) => {
+    if (!isToolkitPageVisible()) {
+      return;
+    }
     if (window.__toolkitIsRendering || !hasRelevantNonToolkitMutation(mutations)) {
       return;
     }
@@ -428,6 +461,9 @@ if (!window[TOOLKIT_BOOTSTRAP_FLAG]) {
     );
 
   const handleSidebarMutations = (mutations) => {
+    if (!isToolkitPageVisible()) {
+      return;
+    }
     if (window.__toolkitIsRendering || !hasRelevantNonToolkitMutation(mutations)) {
       return;
     }
@@ -440,6 +476,11 @@ if (!window[TOOLKIT_BOOTSTRAP_FLAG]) {
   };
 
   const syncScopedObservers = ({ forcePresenceCheck = false, retriesRemaining = 0 } = {}) => {
+    if (!isToolkitPageVisible()) {
+      pauseScopedObserversForHidden();
+      return;
+    }
+
     if (observerRootSyncTimer) {
       clearTimeout(observerRootSyncTimer);
       observerRootSyncTimer = 0;
@@ -543,12 +584,28 @@ if (!window[TOOLKIT_BOOTSTRAP_FLAG]) {
     });
 
     document.addEventListener("visibilitychange", () => {
-      if (!document.hidden) {
-        syncScopedObservers({
-          forcePresenceCheck: true,
-          retriesRemaining: 4,
-        });
+      if (document.hidden) {
+        pauseScopedObserversForHidden();
+        if (typeof setTimelineScrollListenerEnabled === "function") {
+          setTimelineScrollListenerEnabled(false);
+        }
+        if (typeof clearTimelineRefreshTimer === "function") {
+          clearTimelineRefreshTimer();
+        }
+        return;
       }
+
+      syncScopedObservers({
+        forcePresenceCheck: true,
+        retriesRemaining: 4,
+      });
+      queueObserverCallback();
+      queueUiRefreshDispatch({
+        timelinePosition: true,
+        timelineRefresh: true,
+        closeFolderMenu: true,
+        folderRefresh: true,
+      });
     });
   };
 

@@ -17,6 +17,7 @@ const FOLDER_HEADING_TEXTS = ["你的聊天", "Chats", "Your chats"];
 const FOLDER_MISSING_SECTION_RETRY_LIMIT = 120;
 const FOLDER_MISSING_SECTION_RETRY_DELAY_MS = 180;
 const FOLDER_MISSING_SECTION_RETRY_SLOW_DELAY_MS = 520;
+const FOLDER_MISSING_SECTION_RETRY_HIDDEN_DELAY_MS = 2000;
 
 const getSafeEventTarget = (event) => (event?.target instanceof Element ? event.target : null);
 
@@ -1689,8 +1690,11 @@ const scheduleFolderMissingSectionRetry = () => {
   if (folderMissingSectionRetryTimer) {
     return;
   }
+  const isHidden = document.hidden || document.visibilityState === "hidden";
   const delay =
-    folderState.missingHistoryRetryCount >= Math.floor(FOLDER_MISSING_SECTION_RETRY_LIMIT / 2)
+    isHidden
+      ? FOLDER_MISSING_SECTION_RETRY_HIDDEN_DELAY_MS
+      : folderState.missingHistoryRetryCount >= Math.floor(FOLDER_MISSING_SECTION_RETRY_LIMIT / 2)
       ? FOLDER_MISSING_SECTION_RETRY_SLOW_DELAY_MS
       : FOLDER_MISSING_SECTION_RETRY_DELAY_MS;
   folderMissingSectionRetryTimer = setTimeout(() => {

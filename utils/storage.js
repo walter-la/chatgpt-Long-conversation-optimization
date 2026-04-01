@@ -34,7 +34,7 @@ const loadTimelineVisibility = () => {
     if (stored === null) {
       return false;
     }
-    return stored !== "0" && stored !== "false";
+    return stored === "1" || stored === "true";
   } catch (error) {
     return false;
   }
