@@ -102,6 +102,7 @@ const folderState = {
   dragLayout: null,
   refreshQueued: false,
   refreshPending: false,
+  missingHistoryRetryCount: 0,
 };
 const collapseMemoryState = {
   initialized: false,
@@ -118,6 +119,7 @@ let timelineHighlightTimer = null;
 let timelineRefreshTimer = null;
 let folderHighlightTimer = null;
 let folderSettledRefreshTimer = null;
+let folderMissingSectionRetryTimer = null;
 let collapseMemoryAutoApplyTimer = null;
 let collapseMemoryReoptimizeTimer = null;
 let collapseMemoryArchiveCheckTimer = null;

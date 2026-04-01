@@ -14,6 +14,9 @@ const FOLDER_EMPTY_CLASS = "chatgpt-toolkit-folder-empty";
 const FOLDER_DRAGGING_ATTR = "data-toolkit-folder-dragging";
 const FOLDER_SORTING_ATTR = "data-toolkit-folder-sorting";
 const FOLDER_HEADING_TEXTS = ["你的聊天", "Chats", "Your chats"];
+const FOLDER_MISSING_SECTION_RETRY_LIMIT = 120;
+const FOLDER_MISSING_SECTION_RETRY_DELAY_MS = 180;
+const FOLDER_MISSING_SECTION_RETRY_SLOW_DELAY_MS = 520;
 
 const getSafeEventTarget = (event) => (event?.target instanceof Element ? event.target : null);
 
@@ -224,15 +227,130 @@ const hydrateFoldersFromExtension = async () => {
   scheduleFolderRefresh();
 };
 
+const isChatHeadingLabel = (value) => {
+  if (typeof value !== "string") {
+    return false;
+  }
+
+  const normalized = value.trim();
+  if (!normalized) {
+    return false;
+  }
+
+  if (FOLDER_HEADING_TEXTS.includes(normalized)) {
+    return true;
+  }
+
+  const lowered = normalized.toLowerCase();
+  return lowered.includes("chat") || normalized.includes("聊天");
+};
+
+const findFolderAnchor = () => {
+  const existingManager = document.getElementById(FOLDER_MANAGER_ID);
+  if (existingManager instanceof HTMLElement) {
+    const existingHeaderButton = existingManager.nextElementSibling;
+    if (existingHeaderButton instanceof HTMLElement && existingManager.parentElement instanceof HTMLElement) {
+      return {
+        section: existingManager.parentElement,
+        headerButton: existingHeaderButton,
+      };
+    }
+  }
+
+  const sectionCandidates = Array.from(document.querySelectorAll(".group\\/sidebar-expando-section")).filter(
+    (section) => section instanceof HTMLElement,
+  );
+  for (const section of sectionCandidates) {
+    const headerButton = Array.from(section.querySelectorAll("button")).find((button) => {
+      const heading = button.querySelector("h2.__menu-label");
+      return heading instanceof HTMLElement && isChatHeadingLabel(heading.textContent || "");
+    });
+    if (headerButton instanceof HTMLElement) {
+      return { section, headerButton };
+    }
+  }
+
+  const genericSection = sectionCandidates.find((section) =>
+    Array.from(section.querySelectorAll("button")).some(
+      (button) => button.querySelector("h2.__menu-label") instanceof HTMLElement,
+    ),
+  );
+  if (genericSection instanceof HTMLElement) {
+    const headerButton = Array.from(genericSection.querySelectorAll("button")).find(
+      (button) => button.querySelector("h2.__menu-label") instanceof HTMLElement,
+    );
+    if (headerButton instanceof HTMLElement) {
+      return { section: genericSection, headerButton };
+    }
+  }
+
+  const history = document.querySelector('nav[aria-label] #history, #history');
+  if (history instanceof HTMLElement) {
+    const section = history.closest(".group\\/sidebar-expando-section");
+    const fallbackHeaderButton =
+      history.previousElementSibling instanceof HTMLElement ? history.previousElementSibling : null;
+    if (section instanceof HTMLElement && fallbackHeaderButton instanceof HTMLElement) {
+      return {
+        section,
+        headerButton: fallbackHeaderButton,
+      };
+    }
+  }
+
+  const heading = Array.from(document.querySelectorAll("h2.__menu-label")).find((node) =>
+    isChatHeadingLabel(node.textContent || ""),
+  );
+  if (heading instanceof HTMLElement) {
+    const headerButton = heading.closest("button");
+    const section = headerButton?.closest(".group\\/sidebar-expando-section");
+    if (headerButton instanceof HTMLElement && section instanceof HTMLElement) {
+      return {
+        section,
+        headerButton,
+      };
+    }
+  }
+
+  const fallbackHeading = document.querySelector("h2.__menu-label");
+  if (fallbackHeading instanceof HTMLElement) {
+    const headerButton = fallbackHeading.closest("button");
+    const section = headerButton?.closest(".group\\/sidebar-expando-section");
+    if (headerButton instanceof HTMLElement && section instanceof HTMLElement) {
+      return {
+        section,
+        headerButton,
+      };
+    }
+  }
+
+  return null;
+};
+
+const findHistoryContainer = (section) => {
+  if (section instanceof HTMLElement) {
+    const sectionHistory = section.querySelector("#history");
+    if (sectionHistory instanceof HTMLElement) {
+      return sectionHistory;
+    }
+  }
+
+  const fallbackHistory = document.querySelector('nav[aria-label] #history, #history');
+  return fallbackHistory instanceof HTMLElement ? fallbackHistory : null;
+};
+
 const findChatHistorySection = () => {
-  const history = document.querySelector('nav[aria-label] #history');
+  const anchor = findFolderAnchor();
+  if (!anchor) {
+    return null;
+  }
+
+  const history = findHistoryContainer(anchor.section);
   if (!(history instanceof HTMLElement)) {
     return null;
   }
 
-  const section = history.closest(".group\\/sidebar-expando-section");
-  const fallbackHeaderButton =
-    history.previousElementSibling instanceof HTMLElement ? history.previousElementSibling : null;
+  const section = anchor.section;
+  const fallbackHeaderButton = anchor.headerButton;
 
   if (!(section instanceof HTMLElement)) {
     if (!(fallbackHeaderButton instanceof HTMLElement)) {
@@ -1523,6 +1641,32 @@ const cleanupFolderUi = () => {
   folderState.nativeList = null;
   folderState.menuFolderId = null;
   folderState.currentDropZoneKey = "";
+  folderState.missingHistoryRetryCount = 0;
+};
+
+const clearFolderMissingSectionRetry = (options = {}) => {
+  const { resetCount = true } = options;
+  if (folderMissingSectionRetryTimer) {
+    clearTimeout(folderMissingSectionRetryTimer);
+    folderMissingSectionRetryTimer = null;
+  }
+  if (resetCount) {
+    folderState.missingHistoryRetryCount = 0;
+  }
+};
+
+const scheduleFolderMissingSectionRetry = () => {
+  if (folderMissingSectionRetryTimer) {
+    return;
+  }
+  const delay =
+    folderState.missingHistoryRetryCount >= Math.floor(FOLDER_MISSING_SECTION_RETRY_LIMIT / 2)
+      ? FOLDER_MISSING_SECTION_RETRY_SLOW_DELAY_MS
+      : FOLDER_MISSING_SECTION_RETRY_DELAY_MS;
+  folderMissingSectionRetryTimer = setTimeout(() => {
+    folderMissingSectionRetryTimer = null;
+    scheduleFolderRefresh();
+  }, delay);
 };
 
 const ensureFolderManager = (section, headerButton) => {
@@ -1979,25 +2123,59 @@ const syncUngroupedButtonPresentation = (manager, ungroupedCount) => {
 const renderFolders = () => {
   hydrateFolders();
 
-  const sectionData = findChatHistorySection();
-  if (!sectionData) {
+  const anchorData = findFolderAnchor();
+  if (!anchorData) {
+    const hasSidebarHost = Boolean(
+      document.getElementById("stage-slideover-sidebar") ||
+      document.querySelector('nav[aria-label], aside, [data-testid*="sidebar"], [id*="sidebar"]'),
+    );
+    if (hasSidebarHost && folderState.missingHistoryRetryCount < FOLDER_MISSING_SECTION_RETRY_LIMIT) {
+      folderState.missingHistoryRetryCount += 1;
+      scheduleFolderMissingSectionRetry();
+      return;
+    }
+    clearFolderMissingSectionRetry();
     cleanupFolderUi();
     return;
   }
 
-  const { section, headerButton, history } = sectionData;
+  const { section, headerButton } = anchorData;
+  folderState.section = section;
+  folderState.headerButton = headerButton;
+  const manager = ensureFolderManager(section, headerButton);
+  ensureFolderMenu();
+
+  const history = findHistoryContainer(section);
+  if (!(history instanceof HTMLElement)) {
+    if (folderState.history instanceof HTMLElement) {
+      clearHistoryPresentation(folderState.history);
+    }
+
+    folderState.history = null;
+    folderState.nativeList = null;
+    folderState.currentDropZoneKey = "";
+    folderState.dragLayout = null;
+    syncUngroupedButtonPresentation(manager, 0);
+    syncToolkitTheme();
+
+    folderState.missingHistoryRetryCount = Math.min(
+      folderState.missingHistoryRetryCount + 1,
+      FOLDER_MISSING_SECTION_RETRY_LIMIT,
+    );
+    scheduleFolderMissingSectionRetry();
+    return;
+  }
+
+  clearFolderMissingSectionRetry();
+
   if (folderState.history && folderState.history !== history) {
     clearHistoryPresentation(folderState.history);
   }
 
-  folderState.section = section;
-  folderState.headerButton = headerButton;
   folderState.history = history;
   folderState.nativeList = getNativeConversationList(history);
 
   bindFolderHistoryEvents(history);
-  const manager = ensureFolderManager(section, headerButton);
-  ensureFolderMenu();
 
   const conversationItems = getConversationItems(history);
   const conversationPresentationSet = new Set(

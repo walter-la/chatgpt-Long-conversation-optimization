@@ -3,6 +3,8 @@
  */
 // ============ 时间线功能 ============
 
+let timelineBoundScrollRoot = null;
+
 const getTimelineElements = () => {
   const timeline = document.getElementById(TIMELINE_ID);
   if (!timeline) {
@@ -527,10 +529,10 @@ const syncTimelineNodeButtons = (content, items, contentHeight) => {
 
 const syncTimelineActiveFromViewport = () => {
   if (isTimelineInteractionLocked()) {
-    return;
+    return true;
   }
   if (timelineState.items.length === 0) {
-    return;
+    return false;
   }
 
   const centerY = window.innerHeight / 2;
@@ -554,6 +556,7 @@ const syncTimelineActiveFromViewport = () => {
   if (nearestIndex >= 0 && nearestIndex !== timelineState.activeIndex) {
     setTimelineActiveIndex(nearestIndex);
   }
+  return nearestIndex >= 0;
 };
 
 const onTimelineWindowScroll = () => {
@@ -566,8 +569,26 @@ const onTimelineWindowScroll = () => {
   timelineScrollTicking = true;
   requestAnimationFrame(() => {
     timelineScrollTicking = false;
-    syncTimelineActiveFromViewport();
+    const synced = syncTimelineActiveFromViewport();
+    if (!synced) {
+      scheduleTimelineRefresh();
+    }
   });
+};
+
+const resolveTimelineScrollRoot = () => {
+  const explicitRoot = document.querySelector("[data-scroll-root]");
+  if (explicitRoot instanceof HTMLElement) {
+    return explicitRoot;
+  }
+  const main = document.querySelector("main");
+  if (main instanceof HTMLElement) {
+    const mainRoot = main.closest("[data-scroll-root]");
+    if (mainRoot instanceof HTMLElement) {
+      return mainRoot;
+    }
+  }
+  return null;
 };
 
 const getSidebarRightEdge = () => {
@@ -934,6 +955,83 @@ const handleTimelineMouseLeave = () => {
   hideTimelinePreview();
 };
 
+const clearTimelineRefreshTimer = () => {
+  if (timelineRefreshTimer) {
+    clearTimeout(timelineRefreshTimer);
+    timelineRefreshTimer = null;
+  }
+};
+
+const setTimelineScrollListenerEnabled = (enabled) => {
+  if (enabled) {
+    const nextRoot = resolveTimelineScrollRoot();
+    if (!timelineScrollListenerAdded) {
+      window.addEventListener("scroll", onTimelineWindowScroll, { passive: true });
+      document.addEventListener("scroll", onTimelineWindowScroll, { passive: true, capture: true });
+      timelineScrollListenerAdded = true;
+    }
+    if (timelineBoundScrollRoot && timelineBoundScrollRoot !== nextRoot) {
+      timelineBoundScrollRoot.removeEventListener("scroll", onTimelineWindowScroll);
+    }
+    if (nextRoot && timelineBoundScrollRoot !== nextRoot) {
+      nextRoot.addEventListener("scroll", onTimelineWindowScroll, { passive: true });
+    }
+    timelineBoundScrollRoot = nextRoot;
+    return;
+  }
+
+  if (!timelineScrollListenerAdded) {
+    if (timelineBoundScrollRoot) {
+      timelineBoundScrollRoot.removeEventListener("scroll", onTimelineWindowScroll);
+      timelineBoundScrollRoot = null;
+    }
+    timelineScrollListenerAdded = false;
+    return;
+  }
+
+  window.removeEventListener("scroll", onTimelineWindowScroll);
+  document.removeEventListener("scroll", onTimelineWindowScroll, true);
+  if (timelineBoundScrollRoot) {
+    timelineBoundScrollRoot.removeEventListener("scroll", onTimelineWindowScroll);
+    timelineBoundScrollRoot = null;
+  }
+  timelineScrollListenerAdded = false;
+  timelineScrollTicking = false;
+};
+
+const destroyTimeline = () => {
+  clearTimelineRefreshTimer();
+  if (timelineHintTimer) {
+    clearTimeout(timelineHintTimer);
+    timelineHintTimer = null;
+  }
+  if (timelineHighlightTimer) {
+    clearTimeout(timelineHighlightTimer);
+    timelineHighlightTimer = null;
+  }
+
+  document
+    .querySelectorAll(".chatgpt-toolkit-timeline-target")
+    .forEach((node) => node.classList.remove("chatgpt-toolkit-timeline-target"));
+
+  const timeline = document.getElementById(TIMELINE_ID);
+  if (timeline instanceof HTMLElement) {
+    timeline.remove();
+  }
+
+  setTimelineScrollListenerEnabled(false);
+  timelineState.items = [];
+  timelineState.sourceNodes = [];
+  timelineState.sourceSignature = "";
+  timelineState.totalUserCount = 0;
+  timelineState.activeIndex = -1;
+  timelineState.hoverIndex = -1;
+  timelineState.signature = "";
+  timelineState.contentHeight = 0;
+  timelineState.rendered = false;
+  timelineState.refreshPending = false;
+};
+
 const updateTimelineCount = (currentNodeOrder, totalCount) => {
   const elements = getTimelineElements();
   const count = elements?.count;
@@ -1010,8 +1108,7 @@ const setTimelineVisibility = (visible, options = {}) => {
   }
 
   if (!timelineState.visible) {
-    hideTimelineHint();
-    hideTimelinePreview();
+    destroyTimeline();
     return;
   }
 
@@ -1023,6 +1120,10 @@ const toggleTimelineVisibility = () => {
 };
 
 const ensureTimeline = () => {
+  if (!timelineState.visible) {
+    return null;
+  }
+
   const existingTimeline = document.getElementById(TIMELINE_ID);
   if (existingTimeline) {
     const existingTrack = existingTimeline.querySelector(`#${TIMELINE_TRACK_ID}`);
@@ -1057,6 +1158,7 @@ const ensureTimeline = () => {
     existingTimeline.classList.toggle("is-hidden", !timelineState.visible);
     enableTimelineDrag(existingTimeline);
     updateTimelinePosition();
+    setTimelineScrollListenerEnabled(true);
     return existingTimeline;
   }
 
@@ -1090,11 +1192,7 @@ const ensureTimeline = () => {
   timeline.addEventListener("mousemove", handleTimelineMouseMove);
   timeline.addEventListener("mouseleave", handleTimelineMouseLeave);
 
-  if (!timelineScrollListenerAdded) {
-    window.addEventListener("scroll", onTimelineWindowScroll, { passive: true });
-    timelineScrollListenerAdded = true;
-  }
-
+  setTimelineScrollListenerEnabled(true);
   document.body.appendChild(timeline);
   enableTimelineDrag(timeline);
   updateTimelinePosition();
@@ -1103,6 +1201,12 @@ const ensureTimeline = () => {
 };
 
 const renderTimeline = () => {
+  updateTimelineToggleButton();
+  if (!timelineState.visible) {
+    destroyTimeline();
+    return;
+  }
+
   ensureConversationState();
   if (isTimelineInteractionLocked()) {
     markTimelineRefreshPending();
@@ -1116,11 +1220,9 @@ const renderTimeline = () => {
   if (!timeline) {
     return;
   }
-  updateTimelineToggleButton();
   timeline.classList.toggle("is-hidden", !timelineState.visible);
   if (!timelineState.visible) {
-    hideTimelineHint();
-    hideTimelinePreview();
+    destroyTimeline();
     return;
   }
 
@@ -1213,6 +1315,10 @@ const renderTimeline = () => {
 };
 
 const scheduleTimelineRefresh = () => {
+  if (!timelineState.visible) {
+    clearTimelineRefreshTimer();
+    return;
+  }
   if (isTimelineInteractionLocked()) {
     markTimelineRefreshPending();
     return;
