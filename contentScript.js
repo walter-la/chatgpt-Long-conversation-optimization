@@ -198,8 +198,52 @@ if (!window[TOOLKIT_BOOTSTRAP_FLAG]) {
     queueObserverCallback();
   };
 
-  const resolveConversationObserverRoot = () =>
-    document.querySelector("[data-scroll-root]") || document.querySelector("main");
+  const getConversationMessageNodes = () =>
+    Array.from(document.querySelectorAll('main [data-message-author-role]')).filter(
+      (node) => node instanceof HTMLElement,
+    );
+
+  const resolveConversationObserverRoot = () => {
+    const scrollRoot = document.querySelector("[data-scroll-root]");
+    const messageNodes = getConversationMessageNodes();
+    const firstMessage = messageNodes[0];
+    const lastMessage = messageNodes[messageNodes.length - 1];
+
+    if (firstMessage instanceof HTMLElement && lastMessage instanceof HTMLElement) {
+      let container = firstMessage;
+      while (container instanceof HTMLElement && !container.contains(lastMessage)) {
+        container = container.parentElement;
+      }
+
+      if (container instanceof HTMLElement) {
+        if (
+          container.matches('[data-message-author-role]') &&
+          container.parentElement instanceof HTMLElement
+        ) {
+          container = container.parentElement;
+        }
+
+        if (container !== document.body && container !== document.documentElement) {
+          return container;
+        }
+      }
+    }
+
+    if (firstMessage instanceof HTMLElement) {
+      const parent = firstMessage.parentElement;
+      if (parent instanceof HTMLElement && parent !== document.body) {
+        return parent;
+      }
+      return firstMessage;
+    }
+
+    if (scrollRoot instanceof HTMLElement) {
+      const mainInsideRoot = scrollRoot.querySelector("main");
+      return mainInsideRoot instanceof HTMLElement ? mainInsideRoot : scrollRoot;
+    }
+
+    return document.querySelector("main");
+  };
 
   const resolveSidebarObserverRoot = () => {
     const history = document.querySelector("#history");
