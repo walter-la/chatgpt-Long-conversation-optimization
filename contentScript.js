@@ -278,10 +278,48 @@ if (!window[TOOLKIT_BOOTSTRAP_FLAG]) {
     observedSidebarRoot = null;
   };
 
+  const getConversationMutationElements = (mutation) => {
+    const elements = [];
+    const targetElement = getObservedElement(mutation?.target);
+    if (targetElement instanceof Element) {
+      elements.push(targetElement);
+    }
+
+    mutation?.addedNodes?.forEach((node) => {
+      const element = getObservedElement(node);
+      if (element instanceof Element) {
+        elements.push(element);
+      }
+    });
+
+    mutation?.removedNodes?.forEach((node) => {
+      const element = getObservedElement(node);
+      if (element instanceof Element) {
+        elements.push(element);
+      }
+    });
+
+    return elements;
+  };
+
+  const mutationTouchesUserMessage = (mutation) =>
+    getConversationMutationElements(mutation).some((element) =>
+      Boolean(
+        element.matches?.('[data-message-author-role="user"]') ||
+        element.closest?.('[data-message-author-role="user"]') ||
+        element.querySelector?.('[data-message-author-role="user"]'),
+      ),
+    );
+
   const handleConversationMutations = (mutations) => {
     if (window.__toolkitIsRendering || !hasRelevantNonToolkitMutation(mutations)) {
       return;
     }
+
+    if (!mutations.some((mutation) => mutationTouchesUserMessage(mutation))) {
+      return;
+    }
+
     markObserverWork({
       conversationSync: true,
       timelineRefresh: true,
@@ -385,7 +423,7 @@ if (!window[TOOLKIT_BOOTSTRAP_FLAG]) {
     if (forcePresenceCheck || conversationRootChanged || sidebarRootChanged) {
       markObserverWork({
         presenceCheck: true,
-        conversationSync: conversationRootChanged,
+        conversationSync: forcePresenceCheck || conversationRootChanged,
         timelineRefresh: conversationRootChanged,
         folderRefresh: forcePresenceCheck || sidebarRootChanged,
       });
