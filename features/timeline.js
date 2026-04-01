@@ -41,8 +41,30 @@ const ensureTimelineTrackContent = (track) => {
   return content;
 };
 
-const getTimelineMessageKey = (node, index) =>
-  node.getAttribute("data-message-id") || node.getAttribute("data-testid") || `timeline-user-${index}`;
+const getTimelineMessageKey = (node, index) => {
+  if (!(node instanceof HTMLElement)) {
+    return `timeline-user-${index}`;
+  }
+
+  const messageId =
+    node.getAttribute("data-message-id") ||
+    node.querySelector("[data-message-id]")?.getAttribute("data-message-id") ||
+    "";
+  if (messageId) {
+    return `mid:${messageId}`;
+  }
+
+  const turnTestId =
+    node.getAttribute("data-testid") ||
+    node.querySelector('[data-testid^="conversation-turn-"]')?.getAttribute("data-testid") ||
+    "";
+  if (turnTestId) {
+    // Append index to avoid collisions when testid is duplicated in nested/virtualized structures.
+    return `tid:${turnTestId}:${index}`;
+  }
+
+  return `timeline-user-${index}`;
+};
 
 const getTimelineSourceNodes = () => {
   const main = document.querySelector("main");
@@ -65,16 +87,12 @@ const getTimelineSourceNodes = () => {
   })();
 
   const uniqueNodes = [];
-  const seen = new Set();
-  filteredByConversation.forEach((node, index) => {
-    const key =
-      node.getAttribute("data-message-id") ||
-      node.getAttribute("data-testid") ||
-      `timeline-source-${index}`;
-    if (seen.has(key)) {
+  const seenNodes = new Set();
+  filteredByConversation.forEach((node) => {
+    if (!(node instanceof HTMLElement) || seenNodes.has(node)) {
       return;
     }
-    seen.add(key);
+    seenNodes.add(node);
     uniqueNodes.push(node);
   });
 
@@ -528,70 +546,139 @@ const syncTimelineNodeButtons = (content, items, contentHeight) => {
   content.replaceChildren(fragment);
 };
 
-const getTimelineViewportMetrics = () => {
-  const fallbackTop = 0;
-  const fallbackBottom = Math.max(0, window.innerHeight);
-  const fallbackCenter = (fallbackTop + fallbackBottom) / 2;
-  const scrollRoot = resolveTimelineScrollRoot();
-
-  if (!(scrollRoot instanceof HTMLElement)) {
-    return {
-      top: fallbackTop,
-      bottom: fallbackBottom,
-      center: fallbackCenter,
-    };
+const getTimelineActiveScrollRoot = () => {
+  if (timelineBoundScrollRoot instanceof HTMLElement && timelineBoundScrollRoot.isConnected) {
+    return timelineBoundScrollRoot;
   }
 
-  const rootRect = scrollRoot.getBoundingClientRect();
-  const top = clampTimelineValue(rootRect.top, fallbackTop, fallbackBottom);
-  const bottom = clampTimelineValue(rootRect.bottom, fallbackTop, fallbackBottom);
-  const height = bottom - top;
-
-  if (!(height > 32)) {
-    return {
-      top: fallbackTop,
-      bottom: fallbackBottom,
-      center: fallbackCenter,
-    };
+  if (timelineWindowScrollBound) {
+    return document.scrollingElement instanceof HTMLElement ? document.scrollingElement : null;
   }
 
+  return resolveTimelineScrollRoot();
+};
+
+const getTimelineViewportMetrics = (scrollRoot = getTimelineActiveScrollRoot()) => {
+  const windowHeight = Math.max(
+    0,
+    window.innerHeight || document.documentElement?.clientHeight || 0,
+  );
+  const windowScrollTop = Math.max(
+    0,
+    window.scrollY || window.pageYOffset || document.documentElement?.scrollTop || 0,
+  );
+  const fallbackViewport = {
+    top: windowScrollTop,
+    bottom: windowScrollTop + windowHeight,
+    center: windowScrollTop + windowHeight / 2,
+    isDocumentLike: true,
+    scrollRoot: null,
+    rootRect: null,
+  };
+
+  if (!(scrollRoot instanceof HTMLElement) || isDocumentLikeScrollRoot(scrollRoot)) {
+    return fallbackViewport;
+  }
+
+  const rootHeight = Math.max(0, scrollRoot.clientHeight);
+  if (!(rootHeight > 32)) {
+    return fallbackViewport;
+  }
+
+  const top = Math.max(0, scrollRoot.scrollTop);
   return {
     top,
-    bottom,
-    center: top + height / 2,
+    bottom: top + rootHeight,
+    center: top + rootHeight / 2,
+    isDocumentLike: false,
+    scrollRoot,
+    rootRect: scrollRoot.getBoundingClientRect(),
   };
 };
 
-const isTimelineNodeNearViewport = (rect, viewport) =>
-  rect.bottom > viewport.top && rect.top < viewport.bottom;
-
-const syncTimelineActiveFromViewport = () => {
-  if (isTimelineInteractionLocked()) {
-    return true;
+const getTimelineItemViewportBounds = (node, viewport) => {
+  if (!(node instanceof HTMLElement) || !node.isConnected) {
+    return null;
   }
-  if (timelineState.items.length === 0) {
+
+  const rect = node.getBoundingClientRect();
+  if (!(rect.height > 0)) {
+    return null;
+  }
+
+  const rootRect = viewport.rootRect;
+  if (
+    viewport.isDocumentLike ||
+    !rootRect ||
+    !Number.isFinite(rootRect.top)
+  ) {
+    const top = rect.top + viewport.top;
+    const bottom = rect.bottom + viewport.top;
+    return {
+      top,
+      bottom,
+      center: top + (bottom - top) / 2,
+    };
+  }
+
+  const top = viewport.top + (rect.top - rootRect.top);
+  const bottom = top + rect.height;
+  return {
+    top,
+    bottom,
+    center: top + rect.height / 2,
+  };
+};
+
+const refreshTimelineItemViewportCache = (items, viewport = null) => {
+  const safeItems = Array.isArray(items) ? items : [];
+  if (safeItems.length === 0) {
     return false;
   }
 
-  const viewport = getTimelineViewportMetrics();
+  const metrics = viewport || getTimelineViewportMetrics();
+  let measured = false;
+
+  safeItems.forEach((item) => {
+    const bounds = getTimelineItemViewportBounds(item?.node, metrics);
+    if (!bounds) {
+      item.viewportTop = Number.NaN;
+      item.viewportBottom = Number.NaN;
+      item.viewportCenter = Number.NaN;
+      return;
+    }
+
+    measured = true;
+    item.viewportTop = bounds.top;
+    item.viewportBottom = bounds.bottom;
+    item.viewportCenter = bounds.center;
+  });
+
+  return measured;
+};
+
+const resolveTimelineNearestIndexFromCache = (viewport) => {
+  if (!viewport || timelineState.items.length === 0) {
+    return -1;
+  }
+
   let nearestVisibleIndex = -1;
   let nearestVisibleDistance = Number.POSITIVE_INFINITY;
   let nearestFallbackIndex = -1;
   let nearestFallbackDistance = Number.POSITIVE_INFINITY;
 
   timelineState.items.forEach((item, index) => {
-    const node = item.node;
-    if (!(node instanceof HTMLElement) || !node.isConnected) {
+    const top = Number(item?.viewportTop);
+    const bottom = Number(item?.viewportBottom);
+    const center = Number(item?.viewportCenter);
+    if (!Number.isFinite(top) || !Number.isFinite(bottom) || !Number.isFinite(center)) {
       return;
     }
-    const rect = node.getBoundingClientRect();
-    if (!(rect.height > 0)) {
-      return;
-    }
-    const nodeCenter = rect.top + rect.height / 2;
-    const distance = Math.abs(nodeCenter - viewport.center);
 
-    if (isTimelineNodeNearViewport(rect, viewport)) {
+    const distance = Math.abs(center - viewport.center);
+    const isVisible = bottom > viewport.top && top < viewport.bottom;
+
+    if (isVisible) {
       if (distance < nearestVisibleDistance) {
         nearestVisibleDistance = distance;
         nearestVisibleIndex = index;
@@ -605,7 +692,27 @@ const syncTimelineActiveFromViewport = () => {
     }
   });
 
-  const nextIndex = nearestVisibleIndex >= 0 ? nearestVisibleIndex : nearestFallbackIndex;
+  return nearestVisibleIndex >= 0 ? nearestVisibleIndex : nearestFallbackIndex;
+};
+
+const syncTimelineActiveFromViewport = () => {
+  if (isTimelineInteractionLocked()) {
+    return true;
+  }
+  if (timelineState.items.length === 0) {
+    return false;
+  }
+
+  const viewport = getTimelineViewportMetrics();
+  let nextIndex = resolveTimelineNearestIndexFromCache(viewport);
+  if (nextIndex < 0) {
+    const measured = refreshTimelineItemViewportCache(timelineState.items, viewport);
+    if (!measured) {
+      return false;
+    }
+    nextIndex = resolveTimelineNearestIndexFromCache(viewport);
+  }
+
   if (nextIndex >= 0 && nextIndex !== timelineState.activeIndex) {
     setTimelineActiveIndex(nextIndex);
   }
@@ -617,6 +724,9 @@ const onTimelineWindowScroll = () => {
     return;
   }
   if (isTimelineInteractionLocked()) {
+    return;
+  }
+  if (timelineState.items.length === 0) {
     return;
   }
   if (timelineScrollTicking) {
@@ -1307,7 +1417,15 @@ const renderTimeline = () => {
     return;
   }
 
-  ensureConversationState();
+  const conversationChanged = ensureConversationState();
+  if (conversationChanged) {
+    timelineState.activeIndex = -1;
+    updateTimelineCount(0, 0);
+    hideTimelinePreview();
+    hideTimelineHint();
+    scheduleTimelineRefresh();
+    return;
+  }
   if (isTimelineInteractionLocked()) {
     markTimelineRefreshPending();
     return;
@@ -1383,6 +1501,7 @@ const renderTimeline = () => {
   timelineState.signature = nextSignature;
   timelineState.contentHeight = contentHeight;
   timelineState.rendered = true;
+  refreshTimelineItemViewportCache(timelineState.items);
 
   if (timelineState.items.length === 0) {
     timelineState.activeIndex = -1;

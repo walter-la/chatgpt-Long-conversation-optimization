@@ -16,6 +16,72 @@ if (!window[TOOLKIT_BOOTSTRAP_FLAG]) {
 
   let resizeListenerAdded = false;
   let collapseMemorySyncTimer = 0;
+  let refreshDispatchRafId = 0;
+  let refreshNeedsFolder = false;
+  let refreshNeedsTimeline = false;
+  let refreshNeedsTimelinePosition = false;
+  let refreshNeedsCloseFolderMenu = false;
+
+  const queueUiRefreshDispatch = ({
+    folderRefresh = false,
+    timelineRefresh = false,
+    timelinePosition = false,
+    closeFolderMenu: shouldCloseFolderMenu = false,
+  } = {}) => {
+    if (folderRefresh) {
+      refreshNeedsFolder = true;
+    }
+    if (timelineRefresh && timelineState.visible) {
+      refreshNeedsTimeline = true;
+    }
+    if (timelinePosition && timelineState.visible) {
+      refreshNeedsTimelinePosition = true;
+    }
+    if (shouldCloseFolderMenu) {
+      refreshNeedsCloseFolderMenu = true;
+    }
+
+    if (refreshDispatchRafId) {
+      return;
+    }
+
+    refreshDispatchRafId = requestAnimationFrame(() => {
+      refreshDispatchRafId = 0;
+      const needsFolder = refreshNeedsFolder;
+      const needsTimeline = refreshNeedsTimeline;
+      const needsTimelinePosition = refreshNeedsTimelinePosition;
+      const needsCloseFolderMenu = refreshNeedsCloseFolderMenu;
+
+      refreshNeedsFolder = false;
+      refreshNeedsTimeline = false;
+      refreshNeedsTimelinePosition = false;
+      refreshNeedsCloseFolderMenu = false;
+
+      if (needsCloseFolderMenu) {
+        closeFolderMenu();
+      }
+
+      if (needsTimelinePosition && timelineState.visible) {
+        if (timelineState.pointerDown || timelineState.dragging) {
+          timelineState.refreshPending = true;
+        } else {
+          updateTimelinePosition();
+        }
+      }
+
+      if (needsFolder) {
+        scheduleFolderRefresh();
+      }
+
+      if (needsTimeline && timelineState.visible) {
+        if (timelineState.pointerDown || timelineState.dragging) {
+          timelineState.refreshPending = true;
+        } else {
+          scheduleTimelineRefresh();
+        }
+      }
+    });
+  };
 
   const setupResizeListener = () => {
     if (resizeListenerAdded) {
@@ -33,16 +99,12 @@ if (!window[TOOLKIT_BOOTSTRAP_FLAG]) {
       ) {
         ensureButtonVisible(btn);
       }
-      if (timelineState.visible) {
-        if (timelineState.pointerDown || timelineState.dragging) {
-          timelineState.refreshPending = true;
-        } else {
-          updateTimelinePosition();
-          scheduleTimelineRefresh();
-        }
-      }
-      closeFolderMenu();
-      scheduleFolderRefresh();
+      queueUiRefreshDispatch({
+        timelinePosition: true,
+        timelineRefresh: true,
+        closeFolderMenu: true,
+        folderRefresh: true,
+      });
     });
   };
 
@@ -162,18 +224,10 @@ if (!window[TOOLKIT_BOOTSTRAP_FLAG]) {
           }, 220);
         }
       }
-
-      if (needsFolderRefresh) {
-        scheduleFolderRefresh();
-      }
-
-      if (needsTimelineRefresh && timelineState.visible) {
-        if (timelineState.pointerDown || timelineState.dragging) {
-          timelineState.refreshPending = true;
-        } else {
-          scheduleTimelineRefresh();
-        }
-      }
+      queueUiRefreshDispatch({
+        folderRefresh: needsFolderRefresh,
+        timelineRefresh: needsTimelineRefresh,
+      });
     });
   };
 
@@ -424,7 +478,7 @@ if (!window[TOOLKIT_BOOTSTRAP_FLAG]) {
       markObserverWork({
         presenceCheck: true,
         conversationSync: forcePresenceCheck || conversationRootChanged,
-        timelineRefresh: conversationRootChanged,
+        timelineRefresh: forcePresenceCheck || conversationRootChanged,
         folderRefresh: forcePresenceCheck || sidebarRootChanged,
       });
     }
