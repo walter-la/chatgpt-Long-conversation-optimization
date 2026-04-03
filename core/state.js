@@ -5,6 +5,7 @@ const TOOLKIT_ID = "chatgpt-conversation-toolkit";
 const STATUS_ID = "chatgpt-conversation-toolkit-status";
 const MINIMIZED_ID = "chatgpt-conversation-toolkit-minimized";
 const POSITION_KEY = "chatgpt-toolkit-position";
+const TOOLBAR_MINIMIZED_KEY = "chatgpt-toolkit-toolbar-minimized";
 const LANGUAGE_PREFERENCE_KEY = "chatgpt-toolkit-language";
 const TIMELINE_POSITION_KEY = "chatgpt-toolkit-timeline-position";
 const TIMELINE_VISIBLE_KEY = "chatgpt-toolkit-timeline-visible";

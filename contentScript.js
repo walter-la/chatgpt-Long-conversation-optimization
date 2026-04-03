@@ -6,6 +6,7 @@ if (!window[TOOLKIT_BOOTSTRAP_FLAG]) {
 
   timelineState.visible = loadTimelineVisibility();
   timelineState.manualPosition = loadTimelinePosition();
+  state.isMinimized = loadToolbarMinimizedState();
   initI18n();
   observeThemeOnBodyIfNeeded();
 

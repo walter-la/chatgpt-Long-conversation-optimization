@@ -460,26 +460,27 @@ const ensureMinimizedButton = () => {
   return button;
 };
 
-const minimizeToolbar = () => {
+const applyToolbarVisibility = () => {
   const toolbar = document.getElementById(TOOLKIT_ID);
   const minimized = ensureMinimizedButton();
-  if (!toolbar || !minimized) {
+  if (!(toolbar instanceof HTMLElement) || !(minimized instanceof HTMLElement)) {
     return;
   }
-  toolbar.classList.add("is-hidden");
-  minimized.classList.add("is-visible");
+
+  toolbar.classList.toggle("is-hidden", Boolean(state.isMinimized));
+  minimized.classList.toggle("is-visible", Boolean(state.isMinimized));
+};
+
+const minimizeToolbar = () => {
   state.isMinimized = true;
+  saveToolbarMinimizedState(true);
+  applyToolbarVisibility();
 };
 
 const expandToolbar = () => {
-  const toolbar = document.getElementById(TOOLKIT_ID);
-  const minimized = document.getElementById(MINIMIZED_ID);
-  if (!toolbar || !minimized) {
-    return;
-  }
-  toolbar.classList.remove("is-hidden");
-  minimized.classList.remove("is-visible");
   state.isMinimized = false;
+  saveToolbarMinimizedState(false);
+  applyToolbarVisibility();
 };
 
 const applyFloatingButtonPosition = (button, left, top) => {
@@ -635,6 +636,7 @@ const attachToolbar = () => {
   updateStatusByKey("toolbar.ready", "info");
   updateTimelineToggleButton();
   ensureMinimizedButton();
+  applyToolbarVisibility();
   refreshToolbarLocalization();
   refreshCollapseMemoryIndicator();
   syncToolkitTheme();

@@ -40,6 +40,26 @@ const loadTimelineVisibility = () => {
   }
 };
 
+const saveToolbarMinimizedState = (isMinimized) => {
+  try {
+    localStorage.setItem(TOOLBAR_MINIMIZED_KEY, isMinimized ? "1" : "0");
+  } catch (error) {
+    // Ignore storage write failures.
+  }
+};
+
+const loadToolbarMinimizedState = () => {
+  try {
+    const stored = localStorage.getItem(TOOLBAR_MINIMIZED_KEY);
+    if (stored === null) {
+      return false;
+    }
+    return stored === "1" || stored === "true";
+  } catch (error) {
+    return false;
+  }
+};
+
 const loadTimelinePosition = () => {
   try {
     const stored = localStorage.getItem(TIMELINE_POSITION_KEY);
