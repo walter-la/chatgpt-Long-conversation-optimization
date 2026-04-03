@@ -24,6 +24,7 @@ Current active maintainer: `bujue3709` (primary / sole active maintainer)
 - Full JSON export: export the current conversation even if older messages were previously collapsed.
 - In-page search: search within the current conversation, highlight matches, and jump between results.
 - Prompt library: add, delete, search, categorize, sort, import JSON, export JSON, and copy prompts with one click.
+- LaTeX formula copy: hover rendered formulas and copy LaTeX source in one click.
 - Timeline navigation: generate timeline nodes from loaded user messages, preview them, jump to them, and move the timeline panel around.
 - Conversation folders: manage chat folders above the native “Your chats” list without replacing native conversation nodes.
 - Multilingual UI: currently supports Chinese and English, auto-detects the browser language, falls back to English when no match is available, and can be changed manually from the toolbar.
@@ -144,6 +145,13 @@ The toolbar footer also includes two lightweight links:
   - copy content with one click
 - A success toast appears after copying.
 
+### LaTeX Formula Copy
+
+- When you hover a rendered formula, a `Copy LaTeX` button appears near that formula.
+- Clicking it copies the formula's LaTeX source (not rendered plain text).
+- Copy success/failure is shown in the toolbar status area.
+- For `LaTeX` code blocks, use ChatGPT's native copy button on the right side of the block.
+
 ### Conversation Folders
 
 - Folder controls appear above the sidebar “Your chats” heading.
@@ -178,6 +186,7 @@ features/
   export.js
   folders.js
   search.js
+  latex-copy.js
   timeline.js
   prompt-library.js
 
@@ -216,6 +225,8 @@ manifest.json
   Sidebar folder management, drag classification, folder sorting, and local restore.
 - [features/search.js](./features/search.js)
   Message search and result navigation.
+- [features/latex-copy.js](./features/latex-copy.js)
+  Hover button for rendered formulas and one-click LaTeX source copy.
 - [features/timeline.js](./features/timeline.js)
   Timeline rendering, preview, scrolling, dragging, and active-node synchronization.
 - [features/prompt-library.js](./features/prompt-library.js)
@@ -364,6 +375,7 @@ Import rules:
 
 - The timeline only works with message nodes that are already loaded into the current page.
 - Search only works on messages currently present in the DOM. If messages were hidden by cleanup, restore them first.
+- LaTeX copy mainly targets rendered formula nodes. For `LaTeX` code blocks, use ChatGPT's native copy button.
 - Folder management depends on the current ChatGPT sidebar DOM structure and stores classification locally. It does not sync to the ChatGPT service.
 - ChatGPT DOM changes may require selector updates over time.
 

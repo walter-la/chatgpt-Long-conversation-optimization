@@ -22,6 +22,7 @@
         "ui/theme.js",
         "features/folders.js",
         "features/search.js",
+        "features/latex-copy.js",
         "features/timeline.js",
         "features/prompt-library.js",
         "features/collapse.js",

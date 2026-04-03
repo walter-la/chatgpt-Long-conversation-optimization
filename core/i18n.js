@@ -66,8 +66,14 @@ const I18N_MESSAGES = {
     "status.promptImportNoNew": "Import complete: nothing new was added.",
     "status.promptImportDone": "Import complete: added {count} prompts.",
     "status.promptImportInvalid": "Import failed: invalid JSON format.",
+    "status.latexCopyDone": "LaTeX copied.",
+    "status.latexCopyMissing": "Copy failed: no LaTeX source found.",
+    "status.latexCopyBlocked": "Copy failed: clipboard access is not available.",
 
     "search.noMatch": "No matches",
+
+    "latex.copy": "Copy LaTeX",
+    "latex.copyAria": "Copy this formula as LaTeX",
 
     "timeline.title": "Timeline",
     "timeline.ariaLabel": "Conversation timeline",
@@ -170,8 +176,14 @@ const I18N_MESSAGES = {
     "status.promptImportNoNew": "导入完成：没有新增内容。",
     "status.promptImportDone": "导入完成：新增 {count} 条 Prompt。",
     "status.promptImportInvalid": "导入失败：请检查 JSON 格式。",
+    "status.latexCopyDone": "已复制 LaTeX 公式。",
+    "status.latexCopyMissing": "复制失败：未找到公式源码。",
+    "status.latexCopyBlocked": "复制失败：浏览器不允许访问剪贴板。",
 
     "search.noMatch": "未找到匹配",
+
+    "latex.copy": "复制 LaTeX",
+    "latex.copyAria": "复制该公式的 LaTeX 源码",
 
     "timeline.title": "时间线",
     "timeline.ariaLabel": "对话时间线",
@@ -321,6 +333,9 @@ const refreshLocalizedUi = () => {
   }
   if (typeof refreshFolderLocalization === "function") {
     refreshFolderLocalization();
+  }
+  if (typeof refreshLatexCopyLocalization === "function") {
+    refreshLatexCopyLocalization();
   }
 };
 

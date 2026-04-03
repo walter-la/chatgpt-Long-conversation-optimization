@@ -833,6 +833,43 @@
   transform: translateY(-100%);
 }
 
+.chatgpt-toolkit-latex-copy {
+  position: fixed;
+  z-index: 2147483646;
+  min-height: 28px;
+  border: 1px solid rgba(71, 85, 105, 0.72);
+  border-radius: 999px;
+  padding: 0 10px;
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 1;
+  letter-spacing: 0.01em;
+  cursor: pointer;
+  white-space: nowrap;
+  background: #111827;
+  color: #f8fafc;
+  box-shadow: 0 10px 24px rgba(15, 23, 42, 0.16);
+  opacity: 0;
+  transform: translate3d(0, -2px, 0);
+  pointer-events: none;
+  transition:
+    opacity var(--toolkit-transition-fast),
+    transform var(--toolkit-transition-fast),
+    background-color var(--toolkit-transition-fast),
+    border-color var(--toolkit-transition-fast),
+    color var(--toolkit-transition-fast);
+}
+
+.chatgpt-toolkit-latex-copy.is-visible {
+  opacity: 1;
+  transform: translate3d(0, 0, 0);
+  pointer-events: auto;
+}
+
+.chatgpt-toolkit-latex-copy:hover {
+  border-color: rgba(16, 163, 127, 0.36);
+}
+
 .chatgpt-toolkit-prompt-modal {
   position: fixed;
   inset: 0;
@@ -1407,6 +1444,33 @@
   color: var(--minimized-mark-text);
 }
 
+#chatgpt-toolkit-latex-copy[data-toolkit-theme="light"] {
+  --latex-bg: rgba(255, 255, 255, 0.98);
+  --latex-border: rgba(15, 23, 42, 0.12);
+  --latex-text: #1f2937;
+  --latex-shadow: 0 10px 24px rgba(15, 23, 42, 0.1);
+  --latex-hover: rgba(248, 250, 252, 1);
+}
+
+#chatgpt-toolkit-latex-copy[data-toolkit-theme="dark"] {
+  --latex-bg: rgba(32, 33, 35, 0.99);
+  --latex-border: rgba(255, 255, 255, 0.1);
+  --latex-text: #ececf1;
+  --latex-shadow: 0 12px 26px rgba(0, 0, 0, 0.24);
+  --latex-hover: rgba(255, 255, 255, 0.06);
+}
+
+#chatgpt-toolkit-latex-copy[data-toolkit-theme] {
+  background: var(--latex-bg);
+  border-color: var(--latex-border);
+  color: var(--latex-text);
+  box-shadow: var(--latex-shadow);
+}
+
+#chatgpt-toolkit-latex-copy[data-toolkit-theme]:hover {
+  background: var(--latex-hover);
+}
+
 .chatgpt-toolkit-timeline[data-toolkit-theme="light"] {
   --timeline-panel-bg: #ffffff;
   --timeline-panel-border: rgba(15, 23, 42, 0.08);
@@ -1979,6 +2043,7 @@ html[data-toolkit-folder-sorting="1"] .chatgpt-toolkit-folder-header[draggable="
 .chatgpt-toolkit-folder-menu button:focus-visible,
 .chatgpt-toolkit-minimized:focus-visible,
 .chatgpt-toolkit-timeline-node:focus-visible,
+#chatgpt-toolkit-latex-copy:focus-visible,
 .chatgpt-toolkit-prompt-modal button:focus-visible,
 .chatgpt-toolkit-prompt-modal input:focus-visible,
 .chatgpt-toolkit-prompt-modal select:focus-visible,
@@ -2057,6 +2122,7 @@ html[data-toolkit-folder-sorting="1"] .chatgpt-toolkit-folder-header[draggable="
 @media (prefers-reduced-motion: reduce) {
   #chatgpt-conversation-toolkit *,
   .chatgpt-toolkit-minimized,
+  #chatgpt-toolkit-latex-copy,
   .chatgpt-toolkit-timeline *,
   .chatgpt-toolkit-prompt-modal * {
     animation: none !important;

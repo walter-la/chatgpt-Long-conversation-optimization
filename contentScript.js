@@ -123,6 +123,7 @@ if (!window[TOOLKIT_BOOTSTRAP_FLAG]) {
   initFolders();
   initCollapseMemory();
   attachToolbar();
+  initLatexCopy();
   syncCollapseMemoryForCurrentConversation({ triggerAuto: true, forceAuto: true });
   renderTimeline();
   setupResizeListener();
