@@ -127,9 +127,12 @@ const detectRole = (node) => {
 };
 
 const extractMessageText = (node) => {
-  const contentNode =
-    (node && node.querySelector && node.querySelector("[data-message-author-role]")) || node;
-  return (contentNode?.textContent || "").trim();
+  if (!node) return "";
+  const roleNodes = node.matches && node.matches("[data-message-author-role]") ? [node] : Array.from((node.querySelectorAll && node.querySelectorAll("[data-message-author-role]")) || []);
+  if (roleNodes.length > 0) {
+    return roleNodes.map(rn => (rn.textContent || "").trim()).filter(text => text.length > 0).join("\n\n");
+  }
+  return (node.textContent || "").trim();
 };
 
 const buildMessagePayload = (nodes) => {
@@ -148,7 +151,7 @@ const buildMessagePayload = (nodes) => {
       }
 
       const role = detectRole(roleNode);
-      const text = extractMessageText(roleNode);
+      const text = extractMessageText(node);
 
       if (!text) {
         return null;
