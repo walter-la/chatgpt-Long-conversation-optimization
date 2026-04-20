@@ -235,6 +235,11 @@ if (!window[TOOLKIT_BOOTSTRAP_FLAG]) {
         observeThemeOnBodyIfNeeded();
       }
 
+      if (needsConversationSync || needsTimelineRefresh) {
+        ensureConversationState();
+        getMessageNodes();
+      }
+
       if (needsConversationSync) {
         if (!collapseMemorySyncTimer) {
           collapseMemorySyncTimer = setTimeout(() => {
@@ -385,6 +390,33 @@ if (!window[TOOLKIT_BOOTSTRAP_FLAG]) {
   const mutationTouchesConversationMessage = (mutation) =>
     getConversationMutationElements(mutation).some((element) => isConversationMessageElement(element));
 
+  const syncMessageCacheFromConversationMutations = (mutations) => {
+    if (typeof syncMessageCacheFromNodes !== "function") {
+      return;
+    }
+
+    const messageNodes = [];
+    mutations.forEach((mutation) => {
+      [...Array.from(mutation.addedNodes || []), ...Array.from(mutation.removedNodes || [])].forEach((node) => {
+        const element = getObservedElement(node);
+        if (!(element instanceof Element)) {
+          return;
+        }
+        if (!element.matches?.(MESSAGE_ROOT_SELECTOR) && !element.querySelector?.(MESSAGE_ROOT_SELECTOR)) {
+          return;
+        }
+        const messageNode = normalizeMessageNode(element);
+        if (messageNode instanceof HTMLElement && isConversationMessageElement(messageNode)) {
+          messageNodes.push(messageNode);
+        }
+      });
+    });
+
+    if (messageNodes.length > 0) {
+      syncMessageCacheFromNodes(toUniqueOutermostElements(messageNodes));
+    }
+  };
+
   const handleConversationMutations = (mutations) => {
     if (!isToolkitPageVisible()) {
       return;
@@ -396,6 +428,8 @@ if (!window[TOOLKIT_BOOTSTRAP_FLAG]) {
     if (!mutations.some((mutation) => mutationTouchesConversationMessage(mutation))) {
       return;
     }
+
+    syncMessageCacheFromConversationMutations(mutations);
 
     markObserverWork({
       conversationSync: true,

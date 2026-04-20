@@ -20,6 +20,12 @@ const getConversationKey = () => {
   return `${window.location.pathname}${window.location.search}`;
 };
 
+const MESSAGE_TURN_SELECTOR = [
+  "section[data-turn][data-turn-id]",
+  "[data-turn][data-turn-id]",
+  '[data-testid^="conversation-turn-"]',
+].join(", ");
+
 const MESSAGE_ROLE_SELECTOR = [
   "[data-message-author-role]",
   '[data-testid="user-message"]',
@@ -29,7 +35,8 @@ const MESSAGE_ROLE_SELECTOR = [
 ].join(", ");
 
 const MESSAGE_ROOT_SELECTOR = [
-  '[data-testid^="conversation-turn-"]',
+  MESSAGE_TURN_SELECTOR,
+  "[data-turn-id-container]",
   "[data-message-id]",
   "article",
   MESSAGE_ROLE_SELECTOR,
@@ -42,9 +49,90 @@ const MESSAGE_CONTENT_SELECTOR = [
   ".markdown",
   ".whitespace-pre-wrap",
 ].join(", ");
+const MESSAGE_CACHE_LIMIT = 1500;
+const COLLAPSED_MESSAGE_ATTR = "data-chatgpt-toolkit-collapsed-message";
 
 const getConversationMain = () =>
-  document.querySelector("main") || document.querySelector('[role="main"]');
+  document.querySelector("#thread") ||
+  document.querySelector("main#main") ||
+  document.querySelector('[data-scroll-root] main') ||
+  document.querySelector("main") ||
+  document.querySelector('[role="main"]');
+
+const isConversationDocumentScrollRoot = (root) =>
+  root === document.scrollingElement ||
+  root === document.documentElement ||
+  root === document.body;
+
+const resolveConversationScrollRoot = () => {
+  const explicitRoot = document.querySelector("[data-scroll-root]");
+  if (explicitRoot instanceof HTMLElement) {
+    return explicitRoot;
+  }
+
+  const main = document.querySelector("main#main") || document.querySelector("main");
+  if (main instanceof HTMLElement) {
+    const mainRoot = main.closest("[data-scroll-root]");
+    if (mainRoot instanceof HTMLElement) {
+      return mainRoot;
+    }
+
+    let current = main.parentElement;
+    while (current instanceof HTMLElement && current !== document.body) {
+      const style = window.getComputedStyle(current);
+      const overflowY = style?.overflowY || "";
+      if (
+        (overflowY === "auto" || overflowY === "scroll" || overflowY === "overlay") &&
+        current.scrollHeight > current.clientHeight + 24
+      ) {
+        return current;
+      }
+      current = current.parentElement;
+    }
+  }
+
+  return document.scrollingElement instanceof HTMLElement ? document.scrollingElement : null;
+};
+
+const scrollElementIntoConversationView = (element, options = {}) => {
+  if (!(element instanceof HTMLElement)) {
+    return;
+  }
+
+  const { behavior = "smooth", block = "center" } = options;
+  const scrollRoot = resolveConversationScrollRoot();
+  if (!(scrollRoot instanceof HTMLElement) || isConversationDocumentScrollRoot(scrollRoot)) {
+    element.scrollIntoView({ behavior, block });
+    return;
+  }
+
+  const rootRect = scrollRoot.getBoundingClientRect();
+  const elementRect = element.getBoundingClientRect();
+  if (!(rootRect.height > 0) || !(elementRect.height >= 0)) {
+    element.scrollIntoView({ behavior, block });
+    return;
+  }
+
+  let top = scrollRoot.scrollTop + (elementRect.top - rootRect.top);
+  if (block === "center") {
+    top -= Math.max(0, (scrollRoot.clientHeight - elementRect.height) / 2);
+  } else if (block === "end") {
+    top -= Math.max(0, scrollRoot.clientHeight - elementRect.height);
+  } else if (block === "nearest") {
+    if (elementRect.top >= rootRect.top && elementRect.bottom <= rootRect.bottom) {
+      return;
+    }
+    top = elementRect.top < rootRect.top
+      ? scrollRoot.scrollTop + (elementRect.top - rootRect.top)
+      : scrollRoot.scrollTop + (elementRect.bottom - rootRect.bottom);
+  }
+
+  const maxTop = Math.max(0, scrollRoot.scrollHeight - scrollRoot.clientHeight);
+  scrollRoot.scrollTo({
+    top: Math.min(Math.max(0, top), maxTop),
+    behavior,
+  });
+};
 
 const toUniqueOutermostElements = (elements) => {
   const unique = [];
@@ -70,6 +158,12 @@ const resetConversationState = () => {
   state.collapsedNodes = [];
   state.anchorNode = null;
   state.anchorParent = null;
+  if (state.messageCache instanceof Map) {
+    state.messageCache.clear();
+  } else {
+    state.messageCache = new Map();
+  }
+  state.messageCacheRevision += 1;
   state.searchQuery = '';
   state.searchMatches = [];
   state.currentMatchIndex = -1;
@@ -102,8 +196,12 @@ const normalizeMessageNode = (node) => {
   if (!(node instanceof Element)) {
     return null;
   }
+  const nestedTurn = node.matches("[data-turn-id-container]")
+    ? node.querySelector(MESSAGE_TURN_SELECTOR)
+    : null;
   return (
-    node.closest('[data-testid^="conversation-turn-"]') ||
+    node.closest(MESSAGE_TURN_SELECTOR) ||
+    nestedTurn ||
     node.closest("article") ||
     node.closest("[data-message-id]") ||
     (node.matches(MESSAGE_ROLE_SELECTOR) ? node : node.closest(MESSAGE_ROLE_SELECTOR)) ||
@@ -118,6 +216,16 @@ const getNodeConversationId = (node) =>
   null;
 
 const getMessageNodeKey = (node, index) => {
+  const turnId =
+    node?.getAttribute?.("data-turn-id") ||
+    node?.querySelector?.("[data-turn-id]")?.getAttribute("data-turn-id") ||
+    node?.getAttribute?.("data-turn-id-container") ||
+    node?.querySelector?.("[data-turn-id-container]")?.getAttribute("data-turn-id-container") ||
+    "";
+  if (turnId) {
+    return `turn:${turnId}`;
+  }
+
   const messageId =
     node?.getAttribute?.("data-message-id") ||
     node?.querySelector?.("[data-message-id]")?.getAttribute("data-message-id") ||
@@ -135,6 +243,162 @@ const getMessageNodeKey = (node, index) => {
   }
 
   return node || `message-${index}`;
+};
+
+const getMessageNodeOrder = (node, fallbackIndex = 0) => {
+  const candidates = [
+    node?.getAttribute?.("data-testid") || "",
+    node?.querySelector?.('[data-testid^="conversation-turn-"]')?.getAttribute("data-testid") || "",
+  ];
+
+  for (const candidate of candidates) {
+    const match = candidate.match(/conversation-turn-(\d+)/i);
+    if (match) {
+      const order = Number(match[1]);
+      if (Number.isFinite(order)) {
+        return order;
+      }
+    }
+  }
+
+  return fallbackIndex + 1;
+};
+
+const isToolkitCollapsedMessageNode = (node) =>
+  node instanceof HTMLElement && node.getAttribute(COLLAPSED_MESSAGE_ATTR) === "1";
+
+const releaseDisconnectedCachedMessageNodes = () => {
+  if (!(state.messageCache instanceof Map)) {
+    return false;
+  }
+
+  let changed = false;
+  state.messageCache.forEach((entry) => {
+    if (entry?.node instanceof HTMLElement && !entry.node.isConnected) {
+      entry.node = null;
+      changed = true;
+    }
+  });
+
+  if (changed) {
+    state.messageCacheRevision += 1;
+  }
+
+  return changed;
+};
+
+const syncMessageCacheFromNodes = (nodes) => {
+  if (!Array.isArray(nodes)) {
+    return [];
+  }
+  if (!(state.messageCache instanceof Map)) {
+    state.messageCache = new Map();
+  }
+
+  let changed = false;
+  const now = Date.now();
+  const entries = [];
+  nodes.forEach((node, index) => {
+    if (!(node instanceof HTMLElement)) {
+      return;
+    }
+
+    const key = getMessageNodeKey(node, index);
+    if (!key) {
+      return;
+    }
+
+    const text = extractMessageText(node);
+    if (!text) {
+      return;
+    }
+
+    const role = detectRole(node);
+    const order = getMessageNodeOrder(node, index);
+    const liveNode = node.isConnected ? node : null;
+    const previous = state.messageCache.get(key);
+    const entry = {
+      key,
+      role,
+      text,
+      order,
+      node: liveNode,
+      lastSeenAt: now,
+    };
+    entries.push(entry);
+
+    if (
+      !previous ||
+      previous.role !== role ||
+      previous.text !== text ||
+      previous.order !== order ||
+      previous.node !== liveNode
+    ) {
+      changed = true;
+    }
+    state.messageCache.set(key, entry);
+  });
+
+  if (state.messageCache.size > MESSAGE_CACHE_LIMIT) {
+    const overflow = state.messageCache.size - MESSAGE_CACHE_LIMIT;
+    Array.from(state.messageCache.entries())
+      .sort((left, right) => (left[1].lastSeenAt || 0) - (right[1].lastSeenAt || 0))
+      .slice(0, overflow)
+      .forEach(([key]) => {
+        state.messageCache.delete(key);
+        changed = true;
+      });
+  }
+
+  if (changed) {
+    state.messageCacheRevision += 1;
+  }
+
+  return entries;
+};
+
+const getCachedMessageEntries = (options = {}) => {
+  const { role = "" } = options;
+  getMessageNodes();
+  if (!(state.messageCache instanceof Map)) {
+    state.messageCache = new Map();
+  }
+  releaseDisconnectedCachedMessageNodes();
+
+  return Array.from(state.messageCache.values())
+    .filter((entry) => !role || entry.role === role)
+    .sort((left, right) => {
+      const leftOrder = Number.isFinite(left.order) ? left.order : Number.MAX_SAFE_INTEGER;
+      const rightOrder = Number.isFinite(right.order) ? right.order : Number.MAX_SAFE_INTEGER;
+      if (leftOrder !== rightOrder) {
+        return leftOrder - rightOrder;
+      }
+      return (left.lastSeenAt || 0) - (right.lastSeenAt || 0);
+    });
+};
+
+const resolveCachedMessageNode = (entry) => {
+  if (entry?.node instanceof HTMLElement && entry.node.isConnected) {
+    return entry.node;
+  }
+  if (entry?.node instanceof HTMLElement) {
+    entry.node = null;
+    state.messageCacheRevision += 1;
+  }
+
+  const key = entry?.key || "";
+  if (!key) {
+    return null;
+  }
+
+  const nodes = getMessageNodes();
+  const liveNode = nodes.find((node, index) => getMessageNodeKey(node, index) === key);
+  if (liveNode instanceof HTMLElement) {
+    entry.node = liveNode;
+    return liveNode;
+  }
+
+  return null;
 };
 
 const getMessageNodes = () => {
@@ -172,6 +436,7 @@ const getMessageNodes = () => {
     }
   });
 
+  syncMessageCacheFromNodes(uniqueNodes);
   return uniqueNodes;
 };
 
@@ -182,8 +447,10 @@ const readRoleFromElement = (element) => {
 
   const explicitRole =
     element.getAttribute("data-message-author-role") ||
+    element.getAttribute("data-turn") ||
     element.getAttribute("data-author-role") ||
     element.dataset?.messageAuthorRole ||
+    element.dataset?.turn ||
     "";
   if (explicitRole === "user" || explicitRole === "assistant" || explicitRole === "system") {
     return explicitRole;
@@ -214,10 +481,10 @@ const detectRole = (node) => {
     }
   }
 
-  if (node?.querySelector('[data-message-author-role="user"], [data-testid="user-message"], [data-testid^="user-message"]')) {
+  if (node?.querySelector('[data-turn="user"], [data-message-author-role="user"], [data-testid="user-message"], [data-testid^="user-message"]')) {
     return "user";
   }
-  if (node?.querySelector('[data-message-author-role="assistant"], [data-testid="assistant-message"], [data-testid^="assistant-message"]')) {
+  if (node?.querySelector('[data-turn="assistant"], [data-message-author-role="assistant"], [data-testid="assistant-message"], [data-testid^="assistant-message"]')) {
     return "assistant";
   }
   if (node?.querySelector('img[alt*="ChatGPT"], svg[aria-label*="ChatGPT"], svg[aria-label*="Assistant"]')) {
@@ -263,6 +530,10 @@ const getElementReadableText = (element) => {
         "textarea",
         "input",
         "select",
+        ".sr-only",
+        "[aria-hidden='true']",
+        "[role='group']",
+        "[data-testid$='turn-action-button']",
         `#${TOOLKIT_ID}`,
         `#${MINIMIZED_ID}`,
         `#${TIMELINE_ID}`,

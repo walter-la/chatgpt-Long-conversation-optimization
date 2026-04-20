@@ -48,6 +48,8 @@ const state = {
   conversationKey: null,
   anchorNode: null,
   anchorParent: null,
+  messageCache: new Map(),
+  messageCacheRevision: 0,
   // 搜索相关状态
   searchQuery: '',
   searchMatches: [],

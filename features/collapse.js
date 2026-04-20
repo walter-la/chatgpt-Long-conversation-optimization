@@ -7,6 +7,27 @@ const COLLAPSE_ARCHIVE_CHECK_RETRIES = 6;
 const COLLAPSE_ARCHIVE_TRIGGER_WINDOW_MS = 2200;
 const COLLAPSE_ARCHIVE_ACTION_TEXTS = ["archive", "归档"];
 
+const getUncollapsedMessageNodes = () =>
+  getMessageNodes().filter((node) => !isToolkitCollapsedMessageNode(node));
+
+const softCollapseMessageNode = (node) => {
+  if (!(node instanceof HTMLElement)) {
+    return false;
+  }
+  node.setAttribute(COLLAPSED_MESSAGE_ATTR, "1");
+  node.setAttribute("aria-hidden", "true");
+  return true;
+};
+
+const restoreSoftCollapsedMessageNode = (node) => {
+  if (!(node instanceof HTMLElement)) {
+    return false;
+  }
+  node.removeAttribute(COLLAPSED_MESSAGE_ATTR);
+  node.removeAttribute("aria-hidden");
+  return true;
+};
+
 const normalizeCollapseMemorySnapshot = (snapshot) => {
   const rawEntries = snapshot?.entries && typeof snapshot.entries === "object" ? snapshot.entries : {};
   const now = Date.now();
@@ -293,7 +314,7 @@ const attemptAutoCollapseRememberedConversation = () => {
     return;
   }
 
-  const nodes = getMessageNodes();
+  const nodes = getUncollapsedMessageNodes();
   if (nodes.length === 0) {
     return;
   }
@@ -330,7 +351,7 @@ const shouldAutoReoptimizeCurrentConversation = (conversationKey = state.convers
     return false;
   }
 
-  return getMessageNodes().length >= state.keepLatest + COLLAPSE_AUTO_REOPTIMIZE_BUFFER;
+  return getUncollapsedMessageNodes().length >= state.keepLatest + COLLAPSE_AUTO_REOPTIMIZE_BUFFER;
 };
 
 const attemptAutoReoptimizeCurrentConversation = () => {
@@ -464,7 +485,7 @@ const collapseOldMessages = (options = {}) => {
 
   ensureConversationState();
   const conversationKey = state.conversationKey;
-  const nodes = getMessageNodes();
+  const nodes = getUncollapsedMessageNodes();
   if (nodes.length <= state.keepLatest) {
     if (updateStatus) {
       updateStatusByKey("status.collapseNoNeed", "info");
@@ -482,12 +503,13 @@ const collapseOldMessages = (options = {}) => {
   const nextCollapsedNodes = toCollapse.map((node) => ({
     node,
     parent: node.parentNode,
+    soft: true,
   }));
   state.collapsedNodes = state.isCollapsed
     ? state.collapsedNodes.concat(nextCollapsedNodes)
     : nextCollapsedNodes;
 
-  toCollapse.forEach((node) => node.remove());
+  toCollapse.forEach((node) => softCollapseMessageNode(node));
 
   // 清除搜索状态和高亮
   clearTextHighlights();
@@ -555,8 +577,10 @@ const restoreMessages = (options = {}) => {
   }
 
   // 使用锚点恢复：将所有隐藏的节点按顺序插入到锚点之前
-  state.collapsedNodes.forEach(({ node, parent }) => {
-    if (state.anchorNode && state.anchorParent?.contains(state.anchorNode)) {
+  state.collapsedNodes.forEach(({ node, parent, soft }) => {
+    if (soft || isToolkitCollapsedMessageNode(node)) {
+      restoreSoftCollapsedMessageNode(node);
+    } else if (state.anchorNode && state.anchorParent?.contains(state.anchorNode)) {
       state.anchorParent.insertBefore(node, state.anchorNode);
     } else if (parent) {
       // 如果锚点不存在，尝试添加到原父节点
@@ -571,15 +595,15 @@ const restoreMessages = (options = {}) => {
       const scrollDelta = newRect.top - anchorOffsetTop;
       // 检测 ChatGPT 实际滚动容器（通常是 main 内的可滚动 div，而非 window）
       let scrollContainer = null;
-      let el = anchorElement.parentElement;
-      while (el && el !== document.documentElement) {
-        const style = window.getComputedStyle(el);
-        const overflowY = style.overflowY;
-        if ((overflowY === "auto" || overflowY === "scroll") && el.scrollHeight > el.clientHeight) {
-          scrollContainer = el;
-          break;
-        }
-        el = el.parentElement;
+      const scrollRoot =
+        typeof resolveConversationScrollRoot === "function"
+          ? resolveConversationScrollRoot()
+          : null;
+      if (
+        scrollRoot instanceof HTMLElement &&
+        !(typeof isConversationDocumentScrollRoot === "function" && isConversationDocumentScrollRoot(scrollRoot))
+      ) {
+        scrollContainer = scrollRoot;
       }
       if (scrollContainer) {
         scrollContainer.scrollTop += scrollDelta;

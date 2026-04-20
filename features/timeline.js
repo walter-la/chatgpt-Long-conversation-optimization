@@ -47,6 +47,8 @@ const getTimelineMessageKey = (node, index) => {
   }
 
   const messageId =
+    node.getAttribute("data-turn-id") ||
+    node.querySelector("[data-turn-id]")?.getAttribute("data-turn-id") ||
     node.getAttribute("data-message-id") ||
     node.querySelector("[data-message-id]")?.getAttribute("data-message-id") ||
     "";
@@ -66,20 +68,68 @@ const getTimelineMessageKey = (node, index) => {
   return `timeline-user-${index}`;
 };
 
+const getTimelineSourceKey = (source, index) => {
+  if (source instanceof HTMLElement) {
+    return getTimelineMessageKey(source, index);
+  }
+  return source?.key || `timeline-user-${index}`;
+};
+
+const getTimelineSourceNode = (source, options = {}) => {
+  const { resolve = true } = options;
+  if (source instanceof HTMLElement) {
+    return source;
+  }
+  if (!resolve) {
+    return source?.node instanceof HTMLElement && source.node.isConnected ? source.node : null;
+  }
+  if (typeof resolveCachedMessageNode === "function") {
+    return resolveCachedMessageNode(source);
+  }
+  return source?.node instanceof HTMLElement && source.node.isConnected ? source.node : null;
+};
+
+const getTimelineSourceText = (source) => {
+  if (source instanceof HTMLElement) {
+    return extractMessageText(source);
+  }
+  return source?.text || "";
+};
+
+const getTimelineSourceOrder = (source, index) => {
+  if (source instanceof HTMLElement && typeof getMessageNodeOrder === "function") {
+    return getMessageNodeOrder(source, index);
+  }
+  if (!(source instanceof HTMLElement) && Number.isFinite(source?.order)) {
+    return source.order;
+  }
+  return index + 1;
+};
+
 const getTimelineSourceNodes = () => {
-  const sourceNodes = getUserMessageNodes();
-  const fallbackNodes = sourceNodes.length > 0 ? sourceNodes : getMessageNodes();
-  const uniqueNodes = [];
-  const seenNodes = new Set();
-  fallbackNodes.forEach((node) => {
-    if (!(node instanceof HTMLElement) || seenNodes.has(node)) {
+  const sourceItems =
+    typeof getCachedMessageEntries === "function"
+      ? getCachedMessageEntries({ role: "user" })
+      : getUserMessageNodes();
+  const fallbackItems =
+    sourceItems.length > 0
+      ? sourceItems
+      : typeof getCachedMessageEntries === "function"
+        ? getCachedMessageEntries()
+        : getMessageNodes();
+  const uniqueItems = [];
+  const seenKeys = new Set();
+
+  fallbackItems.forEach((source, index) => {
+    const key = getTimelineSourceKey(source, index);
+    if (!key || seenKeys.has(key)) {
       return;
     }
-    seenNodes.add(node);
-    uniqueNodes.push(node);
+    seenKeys.add(key);
+    uniqueItems.push(source);
   });
 
-  return uniqueNodes;
+  return uniqueItems;
 };
 
 const normalizeTimelineText = (text) => (text || "").replace(/\s+/g, " ").trim();
@@ -237,13 +287,18 @@ const assignTimelinePositions = (items) => {
 const buildTimelineSignature = (items) =>
   items.map((item) => `${item.key}:${Math.round(item.position * 1000)}`).join("|");
 
-const buildTimelineSourceSignature = (nodes) =>
-  nodes.map((node, index) => getTimelineMessageKey(node, index)).join("|");
+const buildTimelineSourceSignature = (sources) =>
+  `${state.messageCacheRevision || 0}|${sources
+    .map((source, index) => `${getTimelineSourceKey(source, index)}:${getTimelineSourceText(source).length}`)
+    .join("|")}`;
 
-const isSameTimelineSource = (nodes, signature) =>
+const isSameTimelineSource = (sources, signature) =>
   timelineState.sourceSignature === signature &&
-  timelineState.sourceNodes.length === nodes.length &&
-  nodes.every((node, index) => node === timelineState.sourceNodes[index]);
+  timelineState.sourceNodes.length === sources.length &&
+  sources.every(
+    (source, index) =>
+      getTimelineSourceKey(source, index) === getTimelineSourceKey(timelineState.sourceNodes[index], index),
+  );
 
 const calculateTimelineContentHeight = (trackHeight, itemCount) => {
   const safeTrackHeight = Math.max(1, Math.round(trackHeight));
@@ -446,25 +501,46 @@ const setTimelineActiveIndex = (index, options = {}) => {
   const currentOrder = Number.isFinite(item.order) ? item.order : index + 1;
   updateTimelineCount(currentOrder, timelineState.totalUserCount);
 
-  if (scrollToMessage && item.node instanceof HTMLElement && item.node.isConnected) {
-    item.node.scrollIntoView({ behavior: "smooth", block: "center" });
+  const liveNode =
+    item.node instanceof HTMLElement && item.node.isConnected
+      ? item.node
+      : getTimelineSourceNode(item.source);
+  if (liveNode instanceof HTMLElement && liveNode.isConnected) {
+    item.node = liveNode;
   }
 
-  if (highlightMessage && item.node instanceof HTMLElement && item.node.isConnected) {
-    highlightTimelineMessageNode(item.node);
+  if (scrollToMessage && liveNode instanceof HTMLElement && liveNode.isConnected) {
+    if (typeof scrollElementIntoConversationView === "function") {
+      scrollElementIntoConversationView(liveNode, { behavior: "smooth", block: "center" });
+    } else {
+      liveNode.scrollIntoView({ behavior: "smooth", block: "center" });
+    }
+  } else if (scrollToMessage) {
+    showTimelineHint(t("timeline.hintMessageNotLoaded"));
+  }
+
+  if (highlightMessage && liveNode instanceof HTMLElement && liveNode.isConnected) {
+    highlightTimelineMessageNode(liveNode);
   }
 };
 
-const buildTimelineItemsFromSourceNodes = (userNodes) => {
+const buildTimelineItemsFromSourceNodes = (sources) => {
   const withTimestamps = [];
   let previousTimestamp = null;
 
-  userNodes.forEach((node, index) => {
-    const timestamp = extractTimelineTimestamp(node, index, previousTimestamp);
+  sources.forEach((source, index) => {
+    const node = getTimelineSourceNode(source, { resolve: false });
+    const timestamp =
+      node instanceof HTMLElement
+        ? extractTimelineTimestamp(node, index, previousTimestamp)
+        : Number.isFinite(previousTimestamp)
+          ? previousTimestamp + 60000
+          : getTimelineSourceOrder(source, index) * 60000;
     previousTimestamp = timestamp;
-    const previewText = normalizeTimelineText(extractMessageText(node));
+    const previewText = normalizeTimelineText(getTimelineSourceText(source));
     withTimestamps.push({
-      key: getTimelineMessageKey(node, index),
+      key: getTimelineSourceKey(source, index),
+      source,
       node,
       timestamp,
       order: index + 1,
@@ -623,7 +699,15 @@ const refreshTimelineItemViewportCache = (items, viewport = null) => {
   let measured = false;
 
   safeItems.forEach((item) => {
-    const bounds = getTimelineItemViewportBounds(item?.node, metrics);
+    const liveNode =
+      item?.node instanceof HTMLElement && item.node.isConnected
+        ? item.node
+        : getTimelineSourceNode(item?.source);
+    if (liveNode instanceof HTMLElement && liveNode.isConnected) {
+      item.node = liveNode;
+    }
+
+    const bounds = getTimelineItemViewportBounds(liveNode, metrics);
     if (!bounds) {
       item.viewportTop = Number.NaN;
       item.viewportBottom = Number.NaN;
@@ -734,6 +818,13 @@ const isDocumentLikeScrollRoot = (root) =>
   root === document.body;
 
 const resolveTimelineScrollRoot = () => {
+  if (typeof resolveConversationScrollRoot === "function") {
+    const conversationRoot = resolveConversationScrollRoot();
+    if (conversationRoot instanceof HTMLElement) {
+      return conversationRoot;
+    }
+  }
+
   const explicitRoot = document.querySelector("[data-scroll-root]");
   if (explicitRoot instanceof HTMLElement) {
     return explicitRoot;

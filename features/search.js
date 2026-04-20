@@ -1,87 +1,110 @@
 /*
  * ChatGPT Conversation Toolkit - Search
  */
-// ============ 搜索功能 ============
 
-const SEARCH_MARK_CLASS = 'chatgpt-toolkit-search-text-match';
-const SEARCH_MARK_ACTIVE_CLASS = 'chatgpt-toolkit-search-text-active';
+const SEARCH_MARK_CLASS = "chatgpt-toolkit-search-text-match";
+const SEARCH_MARK_ACTIVE_CLASS = "chatgpt-toolkit-search-text-active";
 
 const updateSearchUI = () => {
-  const searchResult = document.getElementById('chatgpt-toolkit-search-result');
-  const prevBtn = document.getElementById('chatgpt-toolkit-search-prev');
-  const nextBtn = document.getElementById('chatgpt-toolkit-search-next');
+  const searchResult = document.getElementById("chatgpt-toolkit-search-result");
+  const prevBtn = document.getElementById("chatgpt-toolkit-search-prev");
+  const nextBtn = document.getElementById("chatgpt-toolkit-search-next");
 
-  if (!searchResult || !prevBtn || !nextBtn) return;
+  if (!searchResult || !prevBtn || !nextBtn) {
+    return;
+  }
 
   if (state.searchMatches.length === 0) {
-    if (state.searchQuery) {
-      searchResult.textContent = t("search.noMatch");
-    } else {
-      searchResult.textContent = '';
-    }
+    searchResult.textContent = state.searchQuery ? t("search.noMatch") : "";
     prevBtn.disabled = true;
     nextBtn.disabled = true;
-  } else {
-    searchResult.textContent = `${state.currentMatchIndex + 1} / ${state.searchMatches.length}`;
-    prevBtn.disabled = state.searchMatches.length <= 1;
-    nextBtn.disabled = state.searchMatches.length <= 1;
+    return;
   }
+
+  searchResult.textContent = `${state.currentMatchIndex + 1} / ${state.searchMatches.length}`;
+  prevBtn.disabled = state.searchMatches.length <= 1;
+  nextBtn.disabled = state.searchMatches.length <= 1;
 };
 
-// ---- 文本级高亮：在消息节点内为匹配文字注入 <mark> 标签 ----
+const getSearchMatchNode = (match) => {
+  if (match instanceof HTMLElement) {
+    return match;
+  }
+  if (typeof resolveCachedMessageNode === "function") {
+    return resolveCachedMessageNode(match);
+  }
+  return match?.node instanceof HTMLElement && match.node.isConnected ? match.node : null;
+};
+
+const getSearchMatchLiveNode = (match) => {
+  if (match instanceof HTMLElement) {
+    return match;
+  }
+  return match?.node instanceof HTMLElement && match.node.isConnected ? match.node : null;
+};
+
+const getSearchMatchText = (match) => {
+  if (match instanceof HTMLElement) {
+    return extractMessageText(match);
+  }
+  return match?.text || "";
+};
 
 const clearTextHighlights = () => {
   const marks = document.querySelectorAll(`.${SEARCH_MARK_CLASS}`);
-  marks.forEach(mark => {
+  marks.forEach((mark) => {
     const parent = mark.parentNode;
-    if (!parent) return;
-    // 用纯文本节点替换 mark 元素
-    const textNode = document.createTextNode(mark.textContent);
-    parent.replaceChild(textNode, mark);
-    // 合并相邻文本节点，避免碎片化
+    if (!parent) {
+      return;
+    }
+    parent.replaceChild(document.createTextNode(mark.textContent || ""), mark);
     parent.normalize();
   });
 };
 
-const injectTextHighlights = (containerNode, query) => {
-  if (!query || !(containerNode instanceof HTMLElement)) return;
+const shouldSkipHighlightTextNode = (node) => {
+  const parent = node?.parentElement;
+  if (!parent) {
+    return true;
+  }
 
-  // 收集所有文本节点（跳过 script/style/已有 mark 标签）
-  const walker = document.createTreeWalker(
-    containerNode,
-    NodeFilter.SHOW_TEXT,
-    {
-      acceptNode(node) {
-        const parent = node.parentElement;
-        if (!parent) return NodeFilter.FILTER_REJECT;
-        const tag = parent.tagName;
-        if (tag === 'SCRIPT' || tag === 'STYLE' || tag === 'TEXTAREA' || tag === 'BUTTON') {
-          return NodeFilter.FILTER_REJECT;
-        }
-        if (
-          parent.closest(
-            [
-              "button",
-              "textarea",
-              "input",
-              "select",
-              `#${TOOLKIT_ID}`,
-              `#${MINIMIZED_ID}`,
-              `#${TIMELINE_ID}`,
-              `#${PROMPT_MODAL_ID}`,
-            ].join(", "),
-          )
-        ) {
-          return NodeFilter.FILTER_REJECT;
-        }
-        // 跳过已有的 mark 高亮元素内的文本
-        if (parent.classList && parent.classList.contains(SEARCH_MARK_CLASS)) {
-          return NodeFilter.FILTER_REJECT;
-        }
-        return NodeFilter.FILTER_ACCEPT;
-      },
-    }
+  const tag = parent.tagName;
+  if (tag === "SCRIPT" || tag === "STYLE" || tag === "TEXTAREA" || tag === "BUTTON") {
+    return true;
+  }
+
+  if (parent.classList?.contains(SEARCH_MARK_CLASS)) {
+    return true;
+  }
+
+  return Boolean(
+    parent.closest(
+      [
+        "button",
+        "textarea",
+        "input",
+        "select",
+        `#${TOOLKIT_ID}`,
+        `#${MINIMIZED_ID}`,
+        `#${TIMELINE_ID}`,
+        `#${PROMPT_MODAL_ID}`,
+      ].join(", "),
+    ),
   );
+};
+
+const injectTextHighlights = (containerNode, query) => {
+  if (!query || !(containerNode instanceof HTMLElement)) {
+    return;
+  }
+
+  const walker = document.createTreeWalker(containerNode, NodeFilter.SHOW_TEXT, {
+    acceptNode(node) {
+      return shouldSkipHighlightTextNode(node)
+        ? NodeFilter.FILTER_REJECT
+        : NodeFilter.FILTER_ACCEPT;
+    },
+  });
 
   const textNodes = [];
   let current;
@@ -90,90 +113,88 @@ const injectTextHighlights = (containerNode, query) => {
   }
 
   const lowerQuery = query.toLowerCase();
-  const queryLen = query.length;
+  const queryLength = query.length;
 
-  textNodes.forEach(textNode => {
-    const text = textNode.textContent;
+  textNodes.forEach((textNode) => {
+    const text = textNode.textContent || "";
     const lowerText = text.toLowerCase();
-
-    if (!lowerText.includes(lowerQuery)) return;
+    if (!lowerText.includes(lowerQuery)) {
+      return;
+    }
 
     const fragment = document.createDocumentFragment();
     let lastIndex = 0;
-    let matchIndex;
+    let matchIndex = lowerText.indexOf(lowerQuery, lastIndex);
 
-    while ((matchIndex = lowerText.indexOf(lowerQuery, lastIndex)) !== -1) {
-      // 匹配前的普通文本
+    while (matchIndex !== -1) {
       if (matchIndex > lastIndex) {
         fragment.appendChild(document.createTextNode(text.slice(lastIndex, matchIndex)));
       }
 
-      // 匹配到的文本，包裹在 <mark> 中
-      const mark = document.createElement('mark');
+      const mark = document.createElement("mark");
       mark.className = SEARCH_MARK_CLASS;
-      mark.textContent = text.slice(matchIndex, matchIndex + queryLen);
+      mark.textContent = text.slice(matchIndex, matchIndex + queryLength);
       fragment.appendChild(mark);
 
-      lastIndex = matchIndex + queryLen;
+      lastIndex = matchIndex + queryLength;
+      matchIndex = lowerText.indexOf(lowerQuery, lastIndex);
     }
 
-    // 剩余文本
     if (lastIndex < text.length) {
       fragment.appendChild(document.createTextNode(text.slice(lastIndex)));
     }
 
-    textNode.parentNode.replaceChild(fragment, textNode);
+    textNode.parentNode?.replaceChild(fragment, textNode);
   });
 };
 
-// 高亮当前导航到的匹配消息中的第一个 mark 为 active 状态
 const updateActiveTextMark = () => {
-  // 移除旧的 active 状态
-  document.querySelectorAll(`.${SEARCH_MARK_ACTIVE_CLASS}`).forEach(el => {
-    el.classList.remove(SEARCH_MARK_ACTIVE_CLASS);
+  document.querySelectorAll(`.${SEARCH_MARK_ACTIVE_CLASS}`).forEach((element) => {
+    element.classList.remove(SEARCH_MARK_ACTIVE_CLASS);
   });
 
   if (state.currentMatchIndex < 0 || state.currentMatchIndex >= state.searchMatches.length) {
     return;
   }
 
-  const node = state.searchMatches[state.currentMatchIndex];
-  if (!(node instanceof HTMLElement)) return;
+  const node = getSearchMatchNode(state.searchMatches[state.currentMatchIndex]);
+  if (!(node instanceof HTMLElement)) {
+    return;
+  }
 
-  // 为当前消息节点内的所有 mark 添加 active 样式
-  const marks = node.querySelectorAll(`.${SEARCH_MARK_CLASS}`);
-  marks.forEach(mark => {
+  node.querySelectorAll(`.${SEARCH_MARK_CLASS}`).forEach((mark) => {
     mark.classList.add(SEARCH_MARK_ACTIVE_CLASS);
   });
 };
 
-// ---- 消息节点级高亮（外框轮廓） ----
-
 const clearSearchHighlight = () => {
-  document.querySelectorAll('.chatgpt-toolkit-search-highlight').forEach(el => {
-    el.classList.remove('chatgpt-toolkit-search-highlight');
+  document.querySelectorAll(".chatgpt-toolkit-search-highlight").forEach((element) => {
+    element.classList.remove("chatgpt-toolkit-search-highlight");
   });
 };
 
 const highlightCurrentMatch = () => {
   clearSearchHighlight();
   if (state.currentMatchIndex >= 0 && state.currentMatchIndex < state.searchMatches.length) {
-    const node = state.searchMatches[state.currentMatchIndex];
-    node.classList.add('chatgpt-toolkit-search-highlight');
+    const node = getSearchMatchNode(state.searchMatches[state.currentMatchIndex]);
+    if (node instanceof HTMLElement) {
+      node.classList.add("chatgpt-toolkit-search-highlight");
+    }
   }
   updateActiveTextMark();
 };
+
+const getSearchSources = () =>
+  typeof getCachedMessageEntries === "function" ? getCachedMessageEntries() : getMessageNodes();
 
 const performSearch = (query) => {
   state.searchQuery = query.trim().toLowerCase();
   state.searchMatches = [];
   state.currentMatchIndex = -1;
 
-  // 先清除上一次的所有高亮
   clearTextHighlights();
   clearSearchHighlight();
 
-  // 检查是否处于隐藏状态
   if (state.isCollapsed) {
     updateStatusByKey("status.searchRestoreFirst", "info");
     updateSearchUI();
@@ -185,12 +206,15 @@ const performSearch = (query) => {
     return;
   }
 
-  // 搜索所有消息节点
-  const nodes = getMessageNodes();
-  nodes.forEach(node => {
-    const text = extractMessageText(node).toLowerCase();
-    if (text.includes(state.searchQuery)) {
-      state.searchMatches.push(node);
+  getSearchSources().forEach((source) => {
+    const text = getSearchMatchText(source).toLowerCase();
+    if (!text.includes(state.searchQuery)) {
+      return;
+    }
+
+    state.searchMatches.push(source);
+    const node = getSearchMatchLiveNode(source);
+    if (node instanceof HTMLElement) {
       getMessageTextContainers(node).forEach((container) => {
         injectTextHighlights(container, state.searchQuery);
       });
@@ -207,12 +231,22 @@ const performSearch = (query) => {
 };
 
 const scrollToCurrentMatch = () => {
-  if (state.currentMatchIndex >= 0 && state.currentMatchIndex < state.searchMatches.length) {
-    const node = state.searchMatches[state.currentMatchIndex];
-    // 优先滚动到当前消息内第一个高亮 mark
-    const firstMark = node.querySelector(`.${SEARCH_MARK_CLASS}`);
-    const scrollTarget = firstMark || node;
-    scrollTarget.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  if (state.currentMatchIndex < 0 || state.currentMatchIndex >= state.searchMatches.length) {
+    return;
+  }
+
+  const node = getSearchMatchNode(state.searchMatches[state.currentMatchIndex]);
+  if (!(node instanceof HTMLElement)) {
+    updateStatusByKey("status.searchMatchNotLoaded", "info");
+    return;
+  }
+
+  const firstMark = node.querySelector(`.${SEARCH_MARK_CLASS}`);
+  const scrollTarget = firstMark || node;
+  if (typeof scrollElementIntoConversationView === "function") {
+    scrollElementIntoConversationView(scrollTarget, { behavior: "smooth", block: "center" });
+  } else {
+    scrollTarget.scrollIntoView({ behavior: "smooth", block: "center" });
   }
 };
 
@@ -221,9 +255,12 @@ const navigateToPrevMatch = () => {
     updateStatusByKey("status.searchRestoreFirst", "info");
     return;
   }
-  if (state.searchMatches.length === 0) return;
+  if (state.searchMatches.length === 0) {
+    return;
+  }
 
-  state.currentMatchIndex = (state.currentMatchIndex - 1 + state.searchMatches.length) % state.searchMatches.length;
+  state.currentMatchIndex =
+    (state.currentMatchIndex - 1 + state.searchMatches.length) % state.searchMatches.length;
   highlightCurrentMatch();
   scrollToCurrentMatch();
   updateSearchUI();
@@ -234,12 +271,12 @@ const navigateToNextMatch = () => {
     updateStatusByKey("status.searchRestoreFirst", "info");
     return;
   }
-  if (state.searchMatches.length === 0) return;
+  if (state.searchMatches.length === 0) {
+    return;
+  }
 
   state.currentMatchIndex = (state.currentMatchIndex + 1) % state.searchMatches.length;
   highlightCurrentMatch();
   scrollToCurrentMatch();
   updateSearchUI();
 };
-
-// ============ 时间线功能 ============

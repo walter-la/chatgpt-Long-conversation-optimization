@@ -568,6 +568,10 @@
   box-shadow: 0 0 0 8px rgba(16, 163, 127, 0.08);
 }
 
+[data-chatgpt-toolkit-collapsed-message="1"] {
+  display: none !important;
+}
+
 @keyframes chatgpt-toolkit-timeline-pulse {
   0% {
     outline-color: #10a37f;
