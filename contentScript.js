@@ -271,10 +271,7 @@ if (!window[TOOLKIT_BOOTSTRAP_FLAG]) {
     queueObserverCallback();
   };
 
-  const getConversationMessageNodes = () =>
-    Array.from(document.querySelectorAll('main [data-message-author-role]')).filter(
-      (node) => node instanceof HTMLElement,
-    );
+  const getConversationMessageNodes = () => getMessageNodes();
 
   const resolveConversationObserverRoot = () => {
     const scrollRoot = document.querySelector("[data-scroll-root]");
@@ -289,10 +286,7 @@ if (!window[TOOLKIT_BOOTSTRAP_FLAG]) {
       }
 
       if (container instanceof HTMLElement) {
-        if (
-          container.matches('[data-message-author-role]') &&
-          container.parentElement instanceof HTMLElement
-        ) {
+        if (container.matches(MESSAGE_ROLE_SELECTOR) && container.parentElement instanceof HTMLElement) {
           container = container.parentElement;
         }
 
@@ -388,14 +382,8 @@ if (!window[TOOLKIT_BOOTSTRAP_FLAG]) {
     return elements;
   };
 
-  const mutationTouchesUserMessage = (mutation) =>
-    getConversationMutationElements(mutation).some((element) =>
-      Boolean(
-        element.matches?.('[data-message-author-role="user"]') ||
-        element.closest?.('[data-message-author-role="user"]') ||
-        element.querySelector?.('[data-message-author-role="user"]'),
-      ),
-    );
+  const mutationTouchesConversationMessage = (mutation) =>
+    getConversationMutationElements(mutation).some((element) => isConversationMessageElement(element));
 
   const handleConversationMutations = (mutations) => {
     if (!isToolkitPageVisible()) {
@@ -405,7 +393,7 @@ if (!window[TOOLKIT_BOOTSTRAP_FLAG]) {
       return;
     }
 
-    if (!mutations.some((mutation) => mutationTouchesUserMessage(mutation))) {
+    if (!mutations.some((mutation) => mutationTouchesConversationMessage(mutation))) {
       return;
     }
 

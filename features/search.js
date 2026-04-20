@@ -55,7 +55,23 @@ const injectTextHighlights = (containerNode, query) => {
         const parent = node.parentElement;
         if (!parent) return NodeFilter.FILTER_REJECT;
         const tag = parent.tagName;
-        if (tag === 'SCRIPT' || tag === 'STYLE' || tag === 'TEXTAREA') {
+        if (tag === 'SCRIPT' || tag === 'STYLE' || tag === 'TEXTAREA' || tag === 'BUTTON') {
+          return NodeFilter.FILTER_REJECT;
+        }
+        if (
+          parent.closest(
+            [
+              "button",
+              "textarea",
+              "input",
+              "select",
+              `#${TOOLKIT_ID}`,
+              `#${MINIMIZED_ID}`,
+              `#${TIMELINE_ID}`,
+              `#${PROMPT_MODAL_ID}`,
+            ].join(", "),
+          )
+        ) {
           return NodeFilter.FILTER_REJECT;
         }
         // 跳过已有的 mark 高亮元素内的文本
@@ -172,11 +188,12 @@ const performSearch = (query) => {
   // 搜索所有消息节点
   const nodes = getMessageNodes();
   nodes.forEach(node => {
-    const text = (node.textContent || '').toLowerCase();
+    const text = extractMessageText(node).toLowerCase();
     if (text.includes(state.searchQuery)) {
       state.searchMatches.push(node);
-      // 为此消息节点注入文本级高亮
-      injectTextHighlights(node, state.searchQuery);
+      getMessageTextContainers(node).forEach((container) => {
+        injectTextHighlights(container, state.searchQuery);
+      });
     }
   });
 

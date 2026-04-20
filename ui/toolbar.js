@@ -658,105 +658,203 @@ const openToolkitLink = (url) => {
   window.open(url, "_blank", "noopener,noreferrer");
 };
 
-const openSettingsModal = () => {
-  let modal = document.getElementById("chatgpt-toolkit-settings-modal");
-  if (!modal) {
-    modal = document.createElement("section");
-    modal.id = "chatgpt-toolkit-settings-modal";
-    modal.className = "chatgpt-toolkit-prompt-modal";
-    document.body.appendChild(modal);
+const SETTINGS_MODAL_ID = "chatgpt-toolkit-settings-modal";
+const SETTINGS_INPUT_IDS = Object.freeze({
+  keepLatest: "toolkit-setting-keepLatest",
+  autoReoptimizeBuffer: "toolkit-setting-buffer",
+  timelineVisibleNodeCapacity: "toolkit-setting-timelineCapacity",
+  timelineMaxNodes: "toolkit-setting-timelineMaxNodes",
+  collapseMemoryRetentionDays: "toolkit-setting-retentionDays",
+});
 
-    modal.addEventListener("click", (e) => {
-      const actionTarget = e.target.closest("[data-settings-action]");
-      if (actionTarget) {
-        if (actionTarget.dataset.settingsAction === "close") {
-          modal.classList.remove("is-visible");
-        }
-      }
-    });
+const getSettingsModal = () => document.getElementById(SETTINGS_MODAL_ID);
 
-    if (typeof detectChatGPTTheme === "function" && typeof applyToolkitTheme === "function") {
-      const currentTheme = detectChatGPTTheme();
-      modal.setAttribute("data-toolkit-theme", currentTheme);
+const closeSettingsModal = () => {
+  const modal = getSettingsModal();
+  if (modal instanceof HTMLElement) {
+    modal.classList.remove("is-visible");
+  }
+};
+
+const getSettingsFallbackConfig = () => ({
+  keepLatest: state.keepLatest || 20,
+  autoReoptimizeBuffer: COLLAPSE_AUTO_REOPTIMIZE_BUFFER || 10,
+  timelineVisibleNodeCapacity: TIMELINE_VISIBLE_NODE_CAPACITY || 10,
+  timelineMaxNodes: TIMELINE_MAX_NODES || 20,
+  collapseMemoryRetentionDays: Math.floor((COLLAPSE_MEMORY_RETENTION_MS || 864000000) / 86400000),
+});
+
+const getSettingsConfig = (config) => {
+  const currentConfig =
+    typeof getToolkitConfig === "function" ? getToolkitConfig() : getSettingsFallbackConfig();
+  if (config && typeof normalizeToolkitConfig === "function") {
+    return normalizeToolkitConfig({ ...currentConfig, ...config });
+  }
+  return currentConfig;
+};
+
+const readSettingsInputValue = (id) => {
+  const input = document.getElementById(id);
+  return input instanceof HTMLInputElement ? input.value : undefined;
+};
+
+const readSettingsDraft = () => {
+  const draft = {
+    keepLatest: readSettingsInputValue(SETTINGS_INPUT_IDS.keepLatest),
+    autoReoptimizeBuffer: readSettingsInputValue(SETTINGS_INPUT_IDS.autoReoptimizeBuffer),
+    timelineVisibleNodeCapacity: readSettingsInputValue(SETTINGS_INPUT_IDS.timelineVisibleNodeCapacity),
+    timelineMaxNodes: readSettingsInputValue(SETTINGS_INPUT_IDS.timelineMaxNodes),
+    collapseMemoryRetentionDays: readSettingsInputValue(SETTINGS_INPUT_IDS.collapseMemoryRetentionDays),
+  };
+  return Object.values(draft).some((value) => value !== undefined) ? draft : null;
+};
+
+const applySettingsSideEffects = (previousConfig, nextConfig) => {
+  if (!previousConfig || !nextConfig) {
+    return;
+  }
+
+  const timelineConfigChanged =
+    previousConfig.timelineVisibleNodeCapacity !== nextConfig.timelineVisibleNodeCapacity ||
+    previousConfig.timelineMaxNodes !== nextConfig.timelineMaxNodes;
+  if (timelineConfigChanged && typeof forceTimelineRefresh === "function") {
+    forceTimelineRefresh();
+  }
+
+  const retentionChanged =
+    previousConfig.collapseMemoryRetentionDays !== nextConfig.collapseMemoryRetentionDays;
+  if (retentionChanged && typeof pruneCollapseMemoryEntries === "function") {
+    const pruned = pruneCollapseMemoryEntries();
+    if (pruned && typeof syncCollapseMemoryUi === "function") {
+      syncCollapseMemoryUi();
     }
   }
 
-  const render = () => {
-    modal.innerHTML = `
-      <div class="chatgpt-toolkit-prompt-backdrop" data-settings-action="close"></div>
-      <div class="chatgpt-toolkit-prompt-panel" role="dialog" aria-modal="true" aria-label="${t("settings.title")}" style="max-width: 480px;">
-        <div class="chatgpt-toolkit-prompt-header">
-          <strong>${t("settings.title")}</strong>
-          <button type="button" class="chatgpt-toolkit-prompt-close" data-settings-action="close">${t("settings.close")}</button>
+  const autoOptimizeConfigChanged =
+    previousConfig.keepLatest !== nextConfig.keepLatest ||
+    previousConfig.autoReoptimizeBuffer !== nextConfig.autoReoptimizeBuffer ||
+    retentionChanged;
+  if (autoOptimizeConfigChanged && typeof scheduleAutoReoptimizeCurrentConversation === "function") {
+    scheduleAutoReoptimizeCurrentConversation();
+  }
+};
+
+const renderSettingsModal = (modal, draftConfig = null) => {
+  if (!(modal instanceof HTMLElement)) {
+    return;
+  }
+
+  const config = getSettingsConfig(draftConfig);
+  modal.innerHTML = `
+    <div class="chatgpt-toolkit-prompt-backdrop" data-settings-action="close"></div>
+    <div class="chatgpt-toolkit-prompt-panel" role="dialog" aria-modal="true" aria-label="${t("settings.title")}" style="max-width: 480px;">
+      <div class="chatgpt-toolkit-prompt-header">
+        <strong>${t("settings.title")}</strong>
+        <button type="button" class="chatgpt-toolkit-prompt-close" data-settings-action="close">${t("settings.close")}</button>
+      </div>
+      <div class="chatgpt-toolkit-prompt-list" style="padding: 16px; padding-bottom: 24px; overflow-y: auto;">
+        <div class="chatgpt-toolkit-form-group">
+          <label class="chatgpt-toolkit-form-label">${t("settings.keepLatest.label")}</label>
+          <input type="number" id="${SETTINGS_INPUT_IDS.keepLatest}" class="chatgpt-toolkit-input" value="${config.keepLatest}" min="1" max="1000" />
+          <p class="chatgpt-toolkit-form-desc">${t("settings.keepLatest.desc")}</p>
         </div>
-        <div class="chatgpt-toolkit-prompt-list" style="padding: 16px; padding-bottom: 24px; overflow-y: auto;">
-          
-          <div class="chatgpt-toolkit-form-group">
-            <label class="chatgpt-toolkit-form-label">${t("settings.keepLatest.label")}</label>
-            <input type="number" id="toolkit-setting-keepLatest" class="chatgpt-toolkit-input" value="${state.keepLatest || 20}" min="1" max="1000" />
-            <p class="chatgpt-toolkit-form-desc">${t("settings.keepLatest.desc")}</p>
-          </div>
 
-          <div class="chatgpt-toolkit-form-group">
-            <label class="chatgpt-toolkit-form-label">${t("settings.autoReoptimizeBuffer.label")}</label>
-            <input type="number" id="toolkit-setting-buffer" class="chatgpt-toolkit-input" value="${COLLAPSE_AUTO_REOPTIMIZE_BUFFER || 10}" min="1" max="1000" />
-            <p class="chatgpt-toolkit-form-desc">${t("settings.autoReoptimizeBuffer.desc")}</p>
-          </div>
-
-          <div class="chatgpt-toolkit-form-group">
-            <label class="chatgpt-toolkit-form-label">${t("settings.timelineVisibleNodeCapacity.label")}</label>
-            <input type="number" id="toolkit-setting-timelineCapacity" class="chatgpt-toolkit-input" value="${TIMELINE_VISIBLE_NODE_CAPACITY || 10}" min="1" max="100" />
-            <p class="chatgpt-toolkit-form-desc">${t("settings.timelineVisibleNodeCapacity.desc")}</p>
-          </div>
-
-          <div class="chatgpt-toolkit-form-group">
-            <label class="chatgpt-toolkit-form-label">${t("settings.timelineMaxNodes.label")}</label>
-            <input type="number" id="toolkit-setting-timelineMaxNodes" class="chatgpt-toolkit-input" value="${TIMELINE_MAX_NODES || 20}" min="1" max="100" />
-            <p class="chatgpt-toolkit-form-desc">${t("settings.timelineMaxNodes.desc")}</p>
-          </div>
-
-          <div class="chatgpt-toolkit-form-group">
-            <label class="chatgpt-toolkit-form-label">${t("settings.collapseMemoryRetentionDays.label")}</label>
-            <input type="number" id="toolkit-setting-retentionDays" class="chatgpt-toolkit-input" value="${Math.floor((COLLAPSE_MEMORY_RETENTION_MS || 864000000) / 86400000)}" min="1" max="365" />
-            <p class="chatgpt-toolkit-form-desc">${t("settings.collapseMemoryRetentionDays.desc")}</p>
-          </div>
-
+        <div class="chatgpt-toolkit-form-group">
+          <label class="chatgpt-toolkit-form-label">${t("settings.autoReoptimizeBuffer.label")}</label>
+          <input type="number" id="${SETTINGS_INPUT_IDS.autoReoptimizeBuffer}" class="chatgpt-toolkit-input" value="${config.autoReoptimizeBuffer}" min="1" max="1000" />
+          <p class="chatgpt-toolkit-form-desc">${t("settings.autoReoptimizeBuffer.desc")}</p>
         </div>
-        <div class="chatgpt-toolkit-prompt-footer">
-          <span></span>
-          <div class="chatgpt-toolkit-prompt-footer-actions">
-            <button type="button" class="chatgpt-toolkit-settings-save">${t("settings.save")}</button>
-          </div>
+
+        <div class="chatgpt-toolkit-form-group">
+          <label class="chatgpt-toolkit-form-label">${t("settings.timelineVisibleNodeCapacity.label")}</label>
+          <input type="number" id="${SETTINGS_INPUT_IDS.timelineVisibleNodeCapacity}" class="chatgpt-toolkit-input" value="${config.timelineVisibleNodeCapacity}" min="1" max="100" />
+          <p class="chatgpt-toolkit-form-desc">${t("settings.timelineVisibleNodeCapacity.desc")}</p>
+        </div>
+
+        <div class="chatgpt-toolkit-form-group">
+          <label class="chatgpt-toolkit-form-label">${t("settings.timelineMaxNodes.label")}</label>
+          <input type="number" id="${SETTINGS_INPUT_IDS.timelineMaxNodes}" class="chatgpt-toolkit-input" value="${config.timelineMaxNodes}" min="1" max="100" />
+          <p class="chatgpt-toolkit-form-desc">${t("settings.timelineMaxNodes.desc")}</p>
+        </div>
+
+        <div class="chatgpt-toolkit-form-group">
+          <label class="chatgpt-toolkit-form-label">${t("settings.collapseMemoryRetentionDays.label")}</label>
+          <input type="number" id="${SETTINGS_INPUT_IDS.collapseMemoryRetentionDays}" class="chatgpt-toolkit-input" value="${config.collapseMemoryRetentionDays}" min="1" max="365" />
+          <p class="chatgpt-toolkit-form-desc">${t("settings.collapseMemoryRetentionDays.desc")}</p>
         </div>
       </div>
-    `;
+      <div class="chatgpt-toolkit-prompt-footer">
+        <span></span>
+        <div class="chatgpt-toolkit-prompt-footer-actions">
+          <button type="button" class="chatgpt-toolkit-settings-save">${t("settings.save")}</button>
+        </div>
+      </div>
+    </div>
+  `;
 
-    const saveBtn = modal.querySelector(".chatgpt-toolkit-settings-save");
+  const saveBtn = modal.querySelector(".chatgpt-toolkit-settings-save");
+  if (saveBtn instanceof HTMLButtonElement) {
     saveBtn.addEventListener("click", () => {
-      const kl = parseInt(document.getElementById("toolkit-setting-keepLatest").value, 10);
-      const buf = parseInt(document.getElementById("toolkit-setting-buffer").value, 10);
-      const tc = parseInt(document.getElementById("toolkit-setting-timelineCapacity").value, 10);
-      const tmn = parseInt(document.getElementById("toolkit-setting-timelineMaxNodes").value, 10);
-      const rd = parseInt(document.getElementById("toolkit-setting-retentionDays").value, 10);
-      
-      if (typeof saveToolkitConfig === "function") {
-        saveToolkitConfig({
-          keepLatest: kl > 0 ? kl : 20,
-          autoReoptimizeBuffer: buf > 0 ? buf : 10,
-          timelineVisibleNodeCapacity: tc > 0 ? tc : 10,
-          timelineMaxNodes: tmn > 0 ? tmn : 20,
-          collapseMemoryRetentionDays: rd > 0 ? rd : 10,
-        });
-      }
+      const previousConfig = getSettingsConfig();
+      const draft = readSettingsDraft();
+      const nextConfig =
+        typeof saveToolkitConfig === "function"
+          ? saveToolkitConfig(draft || {})
+          : getSettingsConfig(draft);
+
+      applySettingsSideEffects(previousConfig, nextConfig);
 
       if (typeof updateStatusByKey === "function") {
         updateStatusByKey("settings.saved", "success");
       }
-      modal.classList.remove("is-visible");
+      closeSettingsModal();
     });
-  };
+  }
+};
 
-  render();
+const refreshSettingsLocalization = () => {
+  const modal = getSettingsModal();
+  if (!(modal instanceof HTMLElement)) {
+    return;
+  }
+
+  const wasVisible = modal.classList.contains("is-visible");
+  renderSettingsModal(modal, readSettingsDraft());
+  modal.classList.toggle("is-visible", wasVisible);
+  if (typeof syncToolkitTheme === "function") {
+    syncToolkitTheme();
+  }
+};
+
+const openSettingsModal = () => {
+  let modal = getSettingsModal();
+  if (!modal) {
+    modal = document.createElement("section");
+    modal.id = SETTINGS_MODAL_ID;
+    modal.className = "chatgpt-toolkit-prompt-modal";
+    document.body.appendChild(modal);
+
+    modal.addEventListener("click", (e) => {
+      const target = e.target;
+      const actionTarget =
+        target instanceof Element
+          ? target.closest("[data-settings-action]")
+          : target instanceof Node && target.parentElement
+            ? target.parentElement.closest("[data-settings-action]")
+            : null;
+      if (actionTarget) {
+        if (actionTarget.dataset.settingsAction === "close") {
+          closeSettingsModal();
+        }
+      }
+    });
+
+    if (typeof syncToolkitTheme === "function") {
+      syncToolkitTheme();
+    }
+  }
+
+  renderSettingsModal(modal);
   setTimeout(() => modal.classList.add("is-visible"), 10);
 };
 

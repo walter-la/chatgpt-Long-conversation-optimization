@@ -67,28 +67,11 @@ const getTimelineMessageKey = (node, index) => {
 };
 
 const getTimelineSourceNodes = () => {
-  const main = document.querySelector("main");
-  if (!main) {
-    return [];
-  }
-
-  const candidates = Array.from(main.querySelectorAll('[data-message-author-role="user"]'));
-  const normalized = candidates.map((node) => normalizeMessageNode(node)).filter(Boolean);
-
-  const filteredByConversation = (() => {
-    if (!state.conversationKey) {
-      return normalized;
-    }
-    const scoped = normalized.filter((node) => {
-      const nodeConversationId = getNodeConversationId(node);
-      return !nodeConversationId || nodeConversationId === state.conversationKey;
-    });
-    return scoped.length > 0 ? scoped : normalized;
-  })();
-
+  const sourceNodes = getUserMessageNodes();
+  const fallbackNodes = sourceNodes.length > 0 ? sourceNodes : getMessageNodes();
   const uniqueNodes = [];
   const seenNodes = new Set();
-  filteredByConversation.forEach((node) => {
+  fallbackNodes.forEach((node) => {
     if (!(node instanceof HTMLElement) || seenNodes.has(node)) {
       return;
     }
@@ -1154,6 +1137,20 @@ const clearTimelineRefreshTimer = () => {
     clearTimeout(timelineRefreshTimer);
     timelineRefreshTimer = null;
   }
+};
+
+const forceTimelineRefresh = () => {
+  timelineState.rendered = false;
+  timelineState.sourceSignature = "";
+  timelineState.signature = "";
+  timelineState.contentHeight = 0;
+
+  if (!timelineState.visible) {
+    return;
+  }
+
+  clearTimelineRefreshTimer();
+  renderTimeline();
 };
 
 const setTimelineScrollListenerEnabled = (enabled) => {

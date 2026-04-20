@@ -139,19 +139,100 @@ const themeAttributeFilter = ["class", "data-theme", "style"];
 const TOOLKIT_BOOTSTRAP_FLAG = "__chatgptConversationToolkitBootstrapped";
 
 const TOOLKIT_CONFIG_KEY = "chatgpt-toolkit-config-v2";
+const TOOLKIT_CONFIG_DEFAULTS = Object.freeze({
+  keepLatest: 20,
+  autoReoptimizeBuffer: 10,
+  timelineVisibleNodeCapacity: 10,
+  timelineMaxNodes: 20,
+  collapseMemoryRetentionDays: 10,
+});
+const TOOLKIT_CONFIG_LIMITS = Object.freeze({
+  keepLatest: { min: 1, max: 1000 },
+  autoReoptimizeBuffer: { min: 1, max: 1000 },
+  timelineVisibleNodeCapacity: { min: 1, max: 100 },
+  timelineMaxNodes: { min: 1, max: 100 },
+  collapseMemoryRetentionDays: { min: 1, max: 365 },
+});
+
+const normalizeToolkitConfigInteger = (value, fallback, limits) => {
+  if (value === "" || value === null || value === undefined) {
+    return fallback;
+  }
+
+  const numberValue = Number(value);
+  if (!Number.isFinite(numberValue)) {
+    return fallback;
+  }
+
+  const integerValue = Math.trunc(numberValue);
+  return Math.min(Math.max(integerValue, limits.min), limits.max);
+};
+
+const normalizeToolkitConfig = (config = {}) => ({
+  keepLatest: normalizeToolkitConfigInteger(
+    config.keepLatest,
+    TOOLKIT_CONFIG_DEFAULTS.keepLatest,
+    TOOLKIT_CONFIG_LIMITS.keepLatest,
+  ),
+  autoReoptimizeBuffer: normalizeToolkitConfigInteger(
+    config.autoReoptimizeBuffer,
+    TOOLKIT_CONFIG_DEFAULTS.autoReoptimizeBuffer,
+    TOOLKIT_CONFIG_LIMITS.autoReoptimizeBuffer,
+  ),
+  timelineVisibleNodeCapacity: normalizeToolkitConfigInteger(
+    config.timelineVisibleNodeCapacity,
+    TOOLKIT_CONFIG_DEFAULTS.timelineVisibleNodeCapacity,
+    TOOLKIT_CONFIG_LIMITS.timelineVisibleNodeCapacity,
+  ),
+  timelineMaxNodes: normalizeToolkitConfigInteger(
+    config.timelineMaxNodes,
+    TOOLKIT_CONFIG_DEFAULTS.timelineMaxNodes,
+    TOOLKIT_CONFIG_LIMITS.timelineMaxNodes,
+  ),
+  collapseMemoryRetentionDays: normalizeToolkitConfigInteger(
+    config.collapseMemoryRetentionDays,
+    TOOLKIT_CONFIG_DEFAULTS.collapseMemoryRetentionDays,
+    TOOLKIT_CONFIG_LIMITS.collapseMemoryRetentionDays,
+  ),
+});
+
+const applyToolkitConfig = (config = {}) => {
+  const normalized = normalizeToolkitConfig(config);
+  state.keepLatest = normalized.keepLatest;
+  COLLAPSE_AUTO_REOPTIMIZE_BUFFER = normalized.autoReoptimizeBuffer;
+  TIMELINE_VISIBLE_NODE_CAPACITY = normalized.timelineVisibleNodeCapacity;
+  TIMELINE_MAX_NODES = normalized.timelineMaxNodes;
+  COLLAPSE_MEMORY_RETENTION_MS = normalized.collapseMemoryRetentionDays * 24 * 60 * 60 * 1000;
+  return normalized;
+};
+
+const getToolkitConfig = () =>
+  normalizeToolkitConfig({
+    keepLatest: state.keepLatest,
+    autoReoptimizeBuffer: COLLAPSE_AUTO_REOPTIMIZE_BUFFER,
+    timelineVisibleNodeCapacity: TIMELINE_VISIBLE_NODE_CAPACITY,
+    timelineMaxNodes: TIMELINE_MAX_NODES,
+    collapseMemoryRetentionDays: Math.floor(COLLAPSE_MEMORY_RETENTION_MS / 86400000),
+  });
 
 const loadToolkitConfig = () => {
   try {
     const stored = localStorage.getItem(TOOLKIT_CONFIG_KEY);
+    let parsed = {};
     if (stored) {
-      const parsed = JSON.parse(stored);
-      if (parsed.keepLatest !== undefined) state.keepLatest = parsed.keepLatest;
-      if (parsed.autoReoptimizeBuffer !== undefined) COLLAPSE_AUTO_REOPTIMIZE_BUFFER = parsed.autoReoptimizeBuffer;
-      if (parsed.timelineVisibleNodeCapacity !== undefined) TIMELINE_VISIBLE_NODE_CAPACITY = parsed.timelineVisibleNodeCapacity;
-      if (parsed.timelineMaxNodes !== undefined) TIMELINE_MAX_NODES = parsed.timelineMaxNodes;
-      if (parsed.collapseMemoryRetentionDays !== undefined) COLLAPSE_MEMORY_RETENTION_MS = parsed.collapseMemoryRetentionDays * 24 * 60 * 60 * 1000;
+      const value = JSON.parse(stored);
+      if (value && typeof value === "object") {
+        parsed = value;
+      }
     }
+
+    const normalized = applyToolkitConfig(parsed);
+    if (stored && JSON.stringify(parsed) !== JSON.stringify(normalized)) {
+      localStorage.setItem(TOOLKIT_CONFIG_KEY, JSON.stringify(normalized));
+    }
+    return normalized;
   } catch (e) {}
+  return getToolkitConfig();
 };
 
 const saveToolkitConfig = (configObj) => {
@@ -162,15 +243,11 @@ const saveToolkitConfig = (configObj) => {
       if (stored) Object.assign(current, JSON.parse(stored));
     } catch (e) {}
     
-    Object.assign(current, configObj);
-    localStorage.setItem(TOOLKIT_CONFIG_KEY, JSON.stringify(current));
-    
-    if (current.keepLatest !== undefined) state.keepLatest = current.keepLatest;
-    if (current.autoReoptimizeBuffer !== undefined) COLLAPSE_AUTO_REOPTIMIZE_BUFFER = current.autoReoptimizeBuffer;
-    if (current.timelineVisibleNodeCapacity !== undefined) TIMELINE_VISIBLE_NODE_CAPACITY = current.timelineVisibleNodeCapacity;
-    if (current.timelineMaxNodes !== undefined) TIMELINE_MAX_NODES = current.timelineMaxNodes;
-    if (current.collapseMemoryRetentionDays !== undefined) COLLAPSE_MEMORY_RETENTION_MS = current.collapseMemoryRetentionDays * 24 * 60 * 60 * 1000;
+    const normalized = applyToolkitConfig({ ...current, ...(configObj || {}) });
+    localStorage.setItem(TOOLKIT_CONFIG_KEY, JSON.stringify(normalized));
+    return normalized;
   } catch (e) {}
+  return getToolkitConfig();
 };
 
 loadToolkitConfig();

@@ -369,6 +369,9 @@ const refreshLocalizedUi = () => {
   if (typeof refreshLatexCopyLocalization === "function") {
     refreshLatexCopyLocalization();
   }
+  if (typeof refreshSettingsLocalization === "function") {
+    refreshSettingsLocalization();
+  }
 };
 
 const setLanguagePreference = (preference, options = {}) => {

@@ -4,8 +4,9 @@
 const exportMessages = () => {
   ensureConversationState();
   const visibleNodes = getMessageNodes();
+  const collapsedNodes = state.collapsedNodes.map((entry) => entry.node).filter(Boolean);
   const nodesForExport = state.isCollapsed
-    ? [...state.cachedNodes, ...visibleNodes.filter((node) => !state.cachedNodes.includes(node))]
+    ? [...collapsedNodes, ...visibleNodes.filter((node) => !collapsedNodes.includes(node))]
     : visibleNodes;
   const messages = buildMessagePayload(nodesForExport);
 
