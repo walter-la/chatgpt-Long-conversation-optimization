@@ -65,6 +65,11 @@ This specification defines the behavior and UI requirements for adding a collaps
 - **Statement**: The prompt title list MUST have a `max-height` (e.g., 220px) and a vertical scrollbar if the content exceeds this height.
 - **Verification**: Add >20 prompts -> verify scrollbar appears and panel height remains stable.
 
+<!-- { "id": "TK-PL-006", "level": "MUST", "owner": "logic", "status": "draft" } -->
+### TK-PL-006: Sync on Modal Close
+- **Statement**: When the full Prompt Library modal is closed, the Prompt Shortcut Area MUST refresh its title list to ensure synchronization with any changes made during the library session.
+- **Verification**: Open library -> Add a prompt -> Close library -> Verify the new prompt appears in the shortcut area list.
+
 ## 4. State Persistence
 
 <!-- { "id": "TK-ST-001", "level": "MUST", "owner": "storage", "status": "draft" } -->

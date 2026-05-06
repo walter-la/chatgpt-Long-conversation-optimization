@@ -276,7 +276,7 @@ const toggleMainMenu = () => {
   }
 };
 
-const renderPromptShortcutList = () => {
+window.renderPromptShortcutList = () => {
   const listContainer = document.getElementById("chatgpt-toolkit-shortcut-list");
   if (!listContainer) return;
   

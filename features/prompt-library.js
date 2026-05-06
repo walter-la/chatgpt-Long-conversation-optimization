@@ -781,6 +781,10 @@ const closePromptModal = () => {
   hidePromptToast();
   modal.classList.remove("is-visible");
   promptState.isOpen = false;
+
+  if (typeof renderPromptShortcutList === "function") {
+    renderPromptShortcutList();
+  }
 };
 
 const handlePromptModalClick = async (event) => {

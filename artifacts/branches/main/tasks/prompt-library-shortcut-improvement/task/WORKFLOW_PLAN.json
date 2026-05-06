@@ -5,7 +5,7 @@
   "scope_slice": "Full implementation of collapsible menu and prompt shortcut area",
   "sequence_rationale": "1. Intake & Spec (Done) 2. State & i18n Data Layer 3. UI Shell (Toolbar Collapse) 4. Shortcut Area Logic 5. Quality Gate Verification",
   "max_risk": "Med",
-  "verification_plan": "Verify TK-UI-001~003, TK-PL-001~005, TK-ST-001~002, TK-I18N-001 via manual extension testing in browser.",
+  "verification_plan": "Verify TK-UI-001~004, TK-PL-001~006, TK-ST-001~002, TK-I18N-001 via manual extension testing in browser.",
   "fallback": "Revert UI changes in toolbar.js and styles.css",
   "plan_status": "in_progress",
   "active_stage": "implementation"
