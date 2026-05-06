@@ -246,12 +246,90 @@ const refreshToolbarLocalization = () => {
   updateTimelineToggleButton();
 };
 
+const updateToolbarCollapseState = () => {
+  const toolbar = document.getElementById(TOOLKIT_ID);
+  if (!(toolbar instanceof HTMLElement)) {
+    return;
+  }
+  toolbar.classList.toggle("is-menu-collapsed", Boolean(state.isMenuCollapsed));
+  const toggleBtn = toolbar.querySelector('[data-action="toggle-menu"]');
+  if (toggleBtn instanceof HTMLButtonElement) {
+    toggleBtn.setAttribute("aria-label", state.isMenuCollapsed ? t("toolbar.expandMenuAria") : t("toolbar.collapseMenuAria"));
+    toggleBtn.style.transform = state.isMenuCollapsed ? "rotate(-90deg)" : "rotate(0)";
+  }
+};
+
+const toggleMainMenu = () => {
+  state.isMenuCollapsed = !state.isMenuCollapsed;
+  if (typeof saveToolMenuCollapsedState === "function") {
+    saveToolMenuCollapsedState(state.isMenuCollapsed);
+  }
+  updateToolbarCollapseState();
+  if (state.isMenuCollapsed) {
+    if (!promptState.loaded && typeof ensurePromptLibraryLoaded === "function") {
+      ensurePromptLibraryLoaded().then(() => {
+        renderPromptShortcutList();
+      });
+    } else {
+      renderPromptShortcutList();
+    }
+  }
+};
+
+const renderPromptShortcutList = () => {
+  const listContainer = document.getElementById("chatgpt-toolkit-shortcut-list");
+  if (!listContainer) return;
+  
+  const categorySelect = document.getElementById("chatgpt-toolkit-shortcut-category-filter");
+  if (categorySelect) {
+    const categories = Array.from(new Set(promptState.items.map((item) => item.category)))
+      .filter(Boolean)
+      .sort((a, b) => compareText(a, b));
+    
+    categorySelect.innerHTML = `<option value="all">${t("prompt.allCategories")}</option>`;
+    categories.forEach((category) => {
+      const option = document.createElement("option");
+      option.value = category;
+      option.textContent = category;
+      categorySelect.appendChild(option);
+    });
+    categorySelect.value = promptState.category;
+  }
+
+  listContainer.innerHTML = "";
+
+  if (promptState.filteredItems.length === 0) {
+    const empty = document.createElement("p");
+    empty.className = "chatgpt-toolkit-prompt-shortcut-empty";
+    empty.textContent = t("prompt.shortcutEmpty");
+    listContainer.appendChild(empty);
+    return;
+  }
+
+  const fragment = document.createDocumentFragment();
+  promptState.filteredItems.forEach((item) => {
+    const itemBtn = document.createElement("button");
+    itemBtn.type = "button";
+    itemBtn.className = "chatgpt-toolkit-prompt-shortcut-item";
+    itemBtn.dataset.action = "copy-shortcut-prompt";
+    itemBtn.dataset.promptId = item.id;
+    itemBtn.textContent = item.title;
+    fragment.appendChild(itemBtn);
+  });
+  listContainer.appendChild(fragment);
+};
+
 const buildToolbar = () => {
   const container = document.createElement("section");
   container.id = TOOLKIT_ID;
   container.innerHTML = `
     <div class="chatgpt-toolkit-header">
-      <strong class="chatgpt-toolkit-title">${t("toolbar.title")}</strong>
+      <div class="chatgpt-toolkit-title-group">
+        <button type="button" class="chatgpt-toolkit-menu-toggle" data-action="toggle-menu" aria-label="${t("toolbar.toggleMenuAria")}">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 9l-7 7-7-7"/></svg>
+        </button>
+        <strong class="chatgpt-toolkit-title">${t("toolbar.title")}</strong>
+      </div>
       <button type="button" class="chatgpt-toolkit-minimize" data-action="minimize" aria-label="${t("toolbar.minimizeAria")}">
         ${t("toolbar.minimize")}
       </button>
@@ -270,36 +348,49 @@ const buildToolbar = () => {
         </label>
       </div>
     </div>
-    <div class="chatgpt-toolkit-actions">
-      <button type="button" class="chatgpt-toolkit-button" data-action="collapse">
-        ${t("toolbar.collapse")}
-      </button>
-      <button type="button" class="chatgpt-toolkit-button" data-action="restore">
-        ${t("toolbar.restore")}
-      </button>
-      <button type="button" class="chatgpt-toolkit-button primary" data-action="export">
-        ${t("toolbar.export")}
-      </button>
+    <div class="chatgpt-toolkit-main-menu">
+      <div class="chatgpt-toolkit-actions">
+        <button type="button" class="chatgpt-toolkit-button" data-action="collapse">
+          ${t("toolbar.collapse")}
+        </button>
+        <button type="button" class="chatgpt-toolkit-button" data-action="restore">
+          ${t("toolbar.restore")}
+        </button>
+        <button type="button" class="chatgpt-toolkit-button primary" data-action="export">
+          ${t("toolbar.export")}
+        </button>
+        <button type="button" class="chatgpt-toolkit-button" data-action="prompt-library">
+          ${t("toolbar.promptLibrary")}
+        </button>
+        <button type="button" class="chatgpt-toolkit-button" data-action="timeline-toggle">
+          ${timelineState.visible ? t("toolbar.timelineHide") : t("toolbar.timelineShow")}
+        </button>
+        <button type="button" class="chatgpt-toolkit-button" data-action="settings">
+          ${t("toolbar.settings")}
+        </button>
+      </div>
+      <div class="chatgpt-toolkit-search">
+        <div class="chatgpt-toolkit-search-row">
+          <input type="text" id="chatgpt-toolkit-search-input" class="chatgpt-toolkit-search-input" placeholder="${t("toolbar.searchPlaceholder")}" />
+          <button type="button" class="chatgpt-toolkit-search-btn" data-action="search" title="${t("toolbar.searchTitle")}">${t("toolbar.search")}</button>
+        </div>
+        <div class="chatgpt-toolkit-search-nav">
+          <button type="button" id="chatgpt-toolkit-search-prev" class="chatgpt-toolkit-nav-btn" data-action="search-prev" disabled title="${t("toolbar.searchPrevTitle")}">${t("toolbar.searchPrev")}</button>
+          <span id="chatgpt-toolkit-search-result" class="chatgpt-toolkit-search-result"></span>
+          <button type="button" id="chatgpt-toolkit-search-next" class="chatgpt-toolkit-nav-btn" data-action="search-next" disabled title="${t("toolbar.searchNextTitle")}">${t("toolbar.searchNext")}</button>
+        </div>
+      </div>
+    </div>
+    <div class="chatgpt-toolkit-prompt-shortcuts">
       <button type="button" class="chatgpt-toolkit-button" data-action="prompt-library">
         ${t("toolbar.promptLibrary")}
       </button>
-      <button type="button" class="chatgpt-toolkit-button" data-action="timeline-toggle">
-        ${timelineState.visible ? t("toolbar.timelineHide") : t("toolbar.timelineShow")}
-      </button>
-      <button type="button" class="chatgpt-toolkit-button" data-action="settings">
-        ${t("toolbar.settings")}
-      </button>
-    </div>
-    <div class="chatgpt-toolkit-search">
-      <div class="chatgpt-toolkit-search-row">
-        <input type="text" id="chatgpt-toolkit-search-input" class="chatgpt-toolkit-search-input" placeholder="${t("toolbar.searchPlaceholder")}" />
-        <button type="button" class="chatgpt-toolkit-search-btn" data-action="search" title="${t("toolbar.searchTitle")}">${t("toolbar.search")}</button>
+      <div class="chatgpt-toolkit-shortcut-filters">
+        <select id="chatgpt-toolkit-shortcut-category-filter">
+          <option value="all">${t("prompt.allCategories")}</option>
+        </select>
       </div>
-      <div class="chatgpt-toolkit-search-nav">
-        <button type="button" id="chatgpt-toolkit-search-prev" class="chatgpt-toolkit-nav-btn" data-action="search-prev" disabled title="${t("toolbar.searchPrevTitle")}">${t("toolbar.searchPrev")}</button>
-        <span id="chatgpt-toolkit-search-result" class="chatgpt-toolkit-search-result"></span>
-        <button type="button" id="chatgpt-toolkit-search-next" class="chatgpt-toolkit-nav-btn" data-action="search-next" disabled title="${t("toolbar.searchNextTitle")}">${t("toolbar.searchNext")}</button>
-      </div>
+      <div id="chatgpt-toolkit-shortcut-list" class="chatgpt-toolkit-prompt-shortcut-list"></div>
     </div>
     <p id="${STATUS_ID}" class="chatgpt-toolkit-status" data-tone="info">${t("toolbar.ready")}</p>
     <p class="chatgpt-toolkit-tip">${t("toolbar.tip")}</p>
@@ -335,11 +426,17 @@ const buildToolbar = () => {
     }
 
     const actionHandlers = {
+      "toggle-menu": () => toggleMainMenu(),
       minimize: () => minimizeToolbar(),
       collapse: () => collapseOldMessages(),
       restore: () => restoreMessages(),
       export: () => exportMessages(),
       "prompt-library": () => void openPromptModal(),
+      "copy-shortcut-prompt": () => {
+        if (actionTarget.dataset.promptId && typeof copyPromptById === "function") {
+          copyPromptById(actionTarget.dataset.promptId);
+        }
+      },
       "timeline-toggle": () => toggleTimelineVisibility(),
       settings: () => openSettingsModal(),
       "open-star-project": () => openToolkitLink(TOOLKIT_REPO_URL),
@@ -366,10 +463,14 @@ const buildToolbar = () => {
 
   container.addEventListener("change", (event) => {
     const target = event.target;
-    if (!(target instanceof HTMLSelectElement) || target.id !== "chatgpt-toolkit-language-select") {
-      return;
+    if (target instanceof HTMLSelectElement && target.id === "chatgpt-toolkit-language-select") {
+      setLanguagePreference(target.value, { persist: true, refresh: true });
     }
-    setLanguagePreference(target.value, { persist: true, refresh: true });
+    if (target instanceof HTMLSelectElement && target.id === "chatgpt-toolkit-shortcut-category-filter") {
+      promptState.category = target.value;
+      applyPromptFilters();
+      renderPromptShortcutList();
+    }
   });
 
   return container;
@@ -646,6 +747,15 @@ const attachToolbar = () => {
   updateTimelineToggleButton();
   ensureMinimizedButton();
   applyToolbarVisibility();
+  if (typeof loadToolMenuCollapsedState === "function") {
+    state.isMenuCollapsed = loadToolMenuCollapsedState();
+  }
+  updateToolbarCollapseState();
+  if (state.isMenuCollapsed && !promptState.loaded && typeof ensurePromptLibraryLoaded === "function") {
+    ensurePromptLibraryLoaded().then(() => renderPromptShortcutList());
+  } else if (state.isMenuCollapsed) {
+    renderPromptShortcutList();
+  }
   refreshToolbarLocalization();
   refreshCollapseMemoryIndicator();
   syncToolkitTheme();

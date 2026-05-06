@@ -192,6 +192,7 @@ const ensurePromptLibraryLoaded = async () => {
   }
 
   promptState.loaded = true;
+  promptState.sortBy = loadPromptSortPreference();
   applyPromptFilters();
 };
 
@@ -835,6 +836,7 @@ const ensurePromptModal = () => {
     }
   });
 
+
   const elements = getPromptModalElements();
   if (elements?.searchInput instanceof HTMLInputElement) {
     elements.searchInput.addEventListener("input", () => {
@@ -849,14 +851,23 @@ const ensurePromptModal = () => {
       promptState.category = elements.categorySelect.value || "all";
       applyPromptFilters();
       renderPromptList();
+      if (typeof renderPromptShortcutList === "function" && document.getElementById("chatgpt-toolkit-shortcut-list")) {
+        renderPromptShortcutList();
+      }
     });
   }
 
   if (elements?.sortSelect instanceof HTMLSelectElement) {
     elements.sortSelect.addEventListener("change", () => {
       promptState.sortBy = elements.sortSelect.value || "updated-desc";
+      if (typeof savePromptSortPreference === "function") {
+        savePromptSortPreference(promptState.sortBy);
+      }
       applyPromptFilters();
       renderPromptList();
+      if (typeof renderPromptShortcutList === "function" && document.getElementById("chatgpt-toolkit-shortcut-list")) {
+        renderPromptShortcutList();
+      }
     });
   }
 

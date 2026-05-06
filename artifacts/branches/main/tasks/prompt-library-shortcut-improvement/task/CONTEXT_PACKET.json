@@ -1,0 +1,31 @@
+{
+  "id": "prompt-library-shortcut-improvement",
+  "title": "ChatGPT Toolkit: Prompt Library Shortcut Experience Improvement",
+  "target_scope": "Prompt Library Shortcut Area and Collapsible Main Panel",
+  "change_type": "add_requirement",
+  "risk_level": "Med",
+  "baseline": {
+    "branch": "main",
+    "description": "ChatGPT Toolkit main panel is always expanded. Prompt Library is a separate popup. No quick access to prompts in the main panel."
+  },
+  "tooling": {
+    "language": "Javascript",
+    "styling": "Vanilla CSS",
+    "type": "Chrome Extension"
+  },
+  "constraints": [
+    "Must use shared data source with existing Prompt Library",
+    "Clicking title only copies content (Schema A)",
+    "Support i18n (English/Chinese)",
+    "Persistence of collapse state and sort preference",
+    "Maintain existing UI behavior when expanded"
+  ],
+  "unknowns": {
+    "decision_blockers": [],
+    "validation_candidates": [],
+    "deferred_items": []
+  },
+  "derived": {
+    "governance_tier": "Standard"
+  }
+}

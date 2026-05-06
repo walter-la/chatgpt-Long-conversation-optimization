@@ -60,6 +60,40 @@ const loadToolbarMinimizedState = () => {
   }
 };
 
+const saveToolMenuCollapsedState = (isCollapsed) => {
+  try {
+    localStorage.setItem(TOOLKIT_MENU_COLLAPSED_KEY, isCollapsed ? "1" : "0");
+  } catch (error) {
+    // Ignore storage write failures.
+  }
+};
+
+const loadToolMenuCollapsedState = () => {
+  try {
+    const value = localStorage.getItem(TOOLKIT_MENU_COLLAPSED_KEY);
+    return value !== null ? (value === "1" || value === "true") : true;
+  } catch (error) {
+    return true;
+  }
+};
+
+const savePromptSortPreference = (sortBy) => {
+  try {
+    localStorage.setItem(PROMPT_SORT_PREFERENCE_KEY, sortBy);
+  } catch (error) {
+    // Ignore storage write failures.
+  }
+};
+
+const loadPromptSortPreference = (defaultSort = "updated-desc") => {
+  try {
+    const stored = localStorage.getItem(PROMPT_SORT_PREFERENCE_KEY);
+    return stored || defaultSort;
+  } catch (error) {
+    return defaultSort;
+  }
+};
+
 const loadTimelinePosition = () => {
   try {
     const stored = localStorage.getItem(TIMELINE_POSITION_KEY);

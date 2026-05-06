@@ -1,0 +1,59 @@
+{
+  "tasks": [
+    {
+      "task_id": "intake",
+      "skill_ref": "s01-intake-authority",
+      "title": "Requirement Intake",
+      "status": "completed",
+      "priority": "High"
+    },
+    {
+      "task_id": "spec-authoring",
+      "skill_ref": "s02-spec-clause-authoring",
+      "title": "Create Specification Document (SPEC)",
+      "status": "completed",
+      "priority": "High",
+      "depends_on": ["intake"]
+    },
+    {
+      "task_id": "impl-state-persistence",
+      "skill_ref": "s05-implementation",
+      "title": "TK-ST-001/002: State Persistence",
+      "status": "completed",
+      "priority": "High",
+      "depends_on": ["spec-authoring"]
+    },
+    {
+      "task_id": "impl-i18n",
+      "skill_ref": "s05-implementation",
+      "title": "TK-I18N-001: i18n Strings",
+      "status": "completed",
+      "priority": "Med",
+      "depends_on": ["spec-authoring"]
+    },
+    {
+      "task_id": "impl-ui-toolbar",
+      "skill_ref": "s05-implementation",
+      "title": "TK-UI-001/002/003: Collapsible Toolbar UI",
+      "status": "pending",
+      "priority": "High",
+      "depends_on": ["impl-state-persistence", "impl-i18n"]
+    },
+    {
+      "task_id": "impl-ui-shortcut",
+      "skill_ref": "s05-implementation",
+      "title": "TK-PL-001/002/003/004/005: Prompt Shortcut Area Logic",
+      "status": "pending",
+      "priority": "High",
+      "depends_on": ["impl-ui-toolbar"]
+    },
+    {
+      "task_id": "quality-gate",
+      "skill_ref": "s06-quality-gate-triage",
+      "title": "Quality Gate Verification",
+      "status": "pending",
+      "priority": "High",
+      "depends_on": ["impl-ui-shortcut"]
+    }
+  ]
+}

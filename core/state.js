@@ -9,6 +9,8 @@ const TOOLBAR_MINIMIZED_KEY = "chatgpt-toolkit-toolbar-minimized";
 const LANGUAGE_PREFERENCE_KEY = "chatgpt-toolkit-language";
 const TIMELINE_POSITION_KEY = "chatgpt-toolkit-timeline-position";
 const TIMELINE_VISIBLE_KEY = "chatgpt-toolkit-timeline-visible";
+const TOOLKIT_MENU_COLLAPSED_KEY = "chatgpt-toolkit-menu-collapsed";
+const PROMPT_SORT_PREFERENCE_KEY = "chatgpt-toolkit-prompt-sort";
 const COLLAPSE_MEMORY_STORAGE_KEY = "chatgpt-toolkit-collapse-memory-v1";
 const COLLAPSE_MEMORY_LOCAL_FALLBACK_KEY = "chatgpt-toolkit-collapse-memory-fallback";
 let COLLAPSE_MEMORY_RETENTION_MS = 10 * 24 * 60 * 60 * 1000;
@@ -48,6 +50,7 @@ const FOLDER_LOCAL_FALLBACK_KEY = "chatgpt-toolkit-folders-fallback";
 const FOLDER_ROOT_ATTR = "data-toolkit-folder-root";
 
 const state = {
+  isMenuCollapsed: true,
   isCollapsed: false,
   isMinimized: false,
   keepLatest: 20,
