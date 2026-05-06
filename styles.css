@@ -1732,6 +1732,11 @@
 .chatgpt-toolkit-prompt-modal[data-toolkit-theme] .chatgpt-toolkit-prompt-item.is-selected {
   background: var(--prompt-surface-selected);
 }
+.chatgpt-toolkit-prompt-modal[data-toolkit-theme] .chatgpt-toolkit-prompt-item.is-editing {
+  background: var(--prompt-surface-selected);
+  border-color: var(--prompt-primary);
+  box-shadow: 0 0 0 1px var(--prompt-primary);
+}
 
 .chatgpt-toolkit-prompt-modal[data-toolkit-theme] .chatgpt-toolkit-prompt-item-meta,
 .chatgpt-toolkit-prompt-modal[data-toolkit-theme] .chatgpt-toolkit-prompt-empty,
@@ -1751,6 +1756,20 @@
 
 .chatgpt-toolkit-prompt-modal[data-toolkit-theme] .chatgpt-toolkit-prompt-delete:hover {
   background: var(--prompt-delete-hover);
+}
+.chatgpt-toolkit-prompt-modal[data-toolkit-theme] .chatgpt-toolkit-prompt-copy {
+  background: var(--prompt-secondary-bg);
+  color: var(--prompt-secondary-text);
+  border: 1px solid var(--prompt-input-border);
+  padding: 4px 8px;
+  border-radius: 6px;
+  font-size: 11px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background-color var(--toolkit-transition-fast);
+}
+.chatgpt-toolkit-prompt-modal[data-toolkit-theme] .chatgpt-toolkit-prompt-copy:hover {
+  background: var(--prompt-secondary-hover);
 }
 
 .chatgpt-toolkit-prompt-modal[data-toolkit-theme] .chatgpt-toolkit-prompt-editor,
@@ -1775,10 +1794,31 @@
 }
 
 .chatgpt-toolkit-prompt-modal[data-toolkit-theme] .chatgpt-toolkit-prompt-add,
+.chatgpt-toolkit-prompt-modal[data-toolkit-theme] .chatgpt-toolkit-prompt-update,
 .chatgpt-toolkit-prompt-modal[data-toolkit-theme] .chatgpt-toolkit-prompt-footer-actions button:last-child {
   background: var(--prompt-primary);
   color: var(--prompt-footer-action-text);
   border-color: rgba(16, 163, 127, 0.44);
+}
+.chatgpt-toolkit-prompt-modal[data-toolkit-theme] .chatgpt-toolkit-prompt-cancel {
+  background: var(--prompt-secondary-bg);
+  color: var(--prompt-secondary-text);
+  border: 1px solid var(--prompt-input-border);
+}
+.chatgpt-toolkit-prompt-modal[data-toolkit-theme] .chatgpt-toolkit-prompt-cancel:hover {
+  background: var(--prompt-secondary-hover);
+}
+.chatgpt-toolkit-prompt-modal[data-toolkit-theme] .chatgpt-toolkit-prompt-editor-actions {
+  display: flex;
+  gap: 8px;
+}
+.chatgpt-toolkit-prompt-modal[data-toolkit-theme] .chatgpt-toolkit-prompt-editor-actions button {
+  flex: 1;
+  min-height: 40px;
+  border-radius: 12px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
 }
 
 .chatgpt-toolkit-prompt-modal[data-toolkit-theme] .chatgpt-toolkit-prompt-list::-webkit-scrollbar-thumb {

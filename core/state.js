@@ -91,6 +91,7 @@ const promptState = {
   searchText: "",
   category: "all",
   sortBy: "updated-desc",
+  editingId: null,
 };
 const timelineState = {
   items: [],

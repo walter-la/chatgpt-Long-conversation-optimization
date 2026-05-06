@@ -81,5 +81,29 @@ This specification defines the behavior and UI requirements for adding a collaps
 
 <!-- { "id": "TK-I18N-001", "level": "MUST", "owner": "i18n", "status": "draft" } -->
 ### TK-I18N-001: Multi-language Support
-- **Statement**: All new UI strings MUST support English and Traditional Chinese.
+- **Statement**:  1. All new UI strings MUST support English and Simplified Chinese (current codebase standard).
+  2. The UI strings SHOULD be easily translatable to Traditional Chinese in the future.
 - **Verification**: Change browser language -> Verify toolkit UI strings update accordingly.
+
+## 6. Prompt Library Modal Management (Full Panel)
+
+<!-- { "id": "TK-PL-M-001", "level": "MUST", "owner": "frontend", "status": "draft" } -->
+### TK-PL-M-001: Prompt Interactions
+- **Statement**: Interactions with prompt items in the modal list MUST follow these rules:
+  1. Clicking the **Prompt Item** (background/title/content) MUST enter Edit Mode (populate bottom form, highlight item).
+  2. Each item MUST include a **"Copy" button**. Clicking this button MUST copy the prompt content to the clipboard.
+  3. Each item MUST include a **"Delete" button**.
+- **Verification**: Click item -> verify form is populated. Click Copy -> verify clipboard.
+
+<!-- { "id": "TK-PL-M-002", "level": "MUST", "owner": "logic", "status": "draft" } -->
+### TK-PL-M-002: Dual-Action Editor Mode
+- **Statement**: When in Edit Mode (an item is selected for editing), the editor form MUST provide three actions:
+  1. **Save Changes**: Update the existing prompt entry (maintaining ID).
+  2. **Add as New**: Create a new prompt based on the current form content (even if editing an old one).
+  3. **Cancel**: Clear the form and exit Edit Mode.
+- **Verification**: In Edit Mode, modify content -> Click Add as New -> Verify a new item is created and original remains unchanged.
+
+<!-- { "id": "TK-PL-M-003", "level": "MUST", "owner": "frontend", "status": "draft" } -->
+### TK-PL-M-003: Visual Feedback during Edit
+- **Statement**: When a prompt is being edited, its item in the list MUST have a visual indicator (e.g., a highlighted border or background color) to show it is the active edit target.
+- **Verification**: Click Edit -> Verify the list item is highlighted.

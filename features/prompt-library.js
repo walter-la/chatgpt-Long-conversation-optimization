@@ -380,6 +380,9 @@ const renderPromptList = () => {
     if (item.id === promptState.selectedId) {
       itemNode.classList.add("is-selected");
     }
+    if (item.id === promptState.editingId) {
+      itemNode.classList.add("is-editing");
+    }
     itemNode.dataset.promptId = item.id;
 
     const header = document.createElement("div");
@@ -389,6 +392,16 @@ const renderPromptList = () => {
     title.className = "chatgpt-toolkit-prompt-item-title";
     title.textContent = item.title;
 
+    const actions = document.createElement("div");
+    actions.className = "chatgpt-toolkit-prompt-item-actions";
+
+    const copyBtn = document.createElement("button");
+    copyBtn.type = "button";
+    copyBtn.className = "chatgpt-toolkit-prompt-copy";
+    copyBtn.dataset.promptAction = "copy";
+    copyBtn.dataset.promptId = item.id;
+    copyBtn.textContent = t("prompt.copy");
+
     const deleteBtn = document.createElement("button");
     deleteBtn.type = "button";
     deleteBtn.className = "chatgpt-toolkit-prompt-delete";
@@ -397,7 +410,9 @@ const renderPromptList = () => {
     deleteBtn.textContent = t("prompt.delete");
 
     header.appendChild(title);
-    header.appendChild(deleteBtn);
+    actions.appendChild(copyBtn);
+    actions.appendChild(deleteBtn);
+    header.appendChild(actions);
 
     const meta = document.createElement("p");
     meta.className = "chatgpt-toolkit-prompt-item-meta";
@@ -469,7 +484,7 @@ const copyPromptById = async (promptId) => {
   showPromptToastByKey("prompt.toastCopyFailed", "error");
 };
 
-const addPromptFromModal = async () => {
+const addPromptFromModal = async (isUpdate = false) => {
   const elements = getPromptModalElements();
   if (!elements) {
     return;
@@ -493,25 +508,79 @@ const addPromptFromModal = async () => {
   const timestamp = Date.now();
   const title = toSafeText(addTitle.value) || content.replace(/\s+/g, " ").slice(0, 24) || t("prompt.untitled");
   const category = normalizeCategory(addCategory.value);
-  const newItem = {
-    id: createPromptId(),
-    title,
-    category,
-    content,
-    createdAt: timestamp,
-    updatedAt: timestamp,
-  };
+  
+  if (isUpdate && promptState.editingId) {
+    const nextItems = promptState.items.map((item) =>
+      item.id === promptState.editingId
+        ? { ...item, title, category, content, updatedAt: timestamp }
+        : item
+    );
+    await savePromptItems(nextItems);
+    promptState.editingId = null;
+    updateStatusByKey("status.promptUpdateDone", "success");
+  } else {
+    const newItem = {
+      id: createPromptId(),
+      title,
+      category,
+      content,
+      createdAt: timestamp,
+      updatedAt: timestamp,
+    };
+    const nextItems = [newItem, ...promptState.items];
+    await savePromptItems(nextItems);
+    promptState.selectedId = newItem.id;
+    promptState.editingId = null; // Also clear edit mode if adding as new
+    updateStatusByKey("status.promptAddDone", "success");
+  }
 
-  const nextItems = [newItem, ...promptState.items];
-  await savePromptItems(nextItems);
-  promptState.selectedId = newItem.id;
   renderPromptList();
+  refreshPromptLocalization();
 
   addTitle.value = "";
   addCategory.value = "";
   addContent.value = "";
+};
 
-  updateStatusByKey("status.promptAddDone", "success");
+const startEditingPrompt = (promptId) => {
+  const item = promptState.items.find((prompt) => prompt.id === promptId);
+  if (!item) {
+    return;
+  }
+
+  const elements = getPromptModalElements();
+  if (
+    !(elements?.addTitle instanceof HTMLInputElement) ||
+    !(elements?.addCategory instanceof HTMLInputElement) ||
+    !(elements?.addContent instanceof HTMLTextAreaElement)
+  ) {
+    return;
+  }
+
+  promptState.editingId = item.id;
+  elements.addTitle.value = item.title;
+  elements.addCategory.value = item.category;
+  elements.addContent.value = item.content;
+
+  refreshPromptLocalization();
+};
+
+const cancelEditingPrompt = () => {
+  const elements = getPromptModalElements();
+  if (
+    !(elements?.addTitle instanceof HTMLInputElement) ||
+    !(elements?.addCategory instanceof HTMLInputElement) ||
+    !(elements?.addContent instanceof HTMLTextAreaElement)
+  ) {
+    return;
+  }
+
+  promptState.editingId = null;
+  elements.addTitle.value = "";
+  elements.addCategory.value = "";
+  elements.addContent.value = "";
+
+  refreshPromptLocalization();
 };
 
 const deletePromptById = async (promptId) => {
@@ -526,6 +595,11 @@ const deletePromptById = async (promptId) => {
 
   const nextItems = promptState.items.filter((prompt) => prompt.id !== promptId);
   await savePromptItems(nextItems);
+  
+  if (promptState.editingId === promptId) {
+    cancelEditingPrompt();
+  }
+  
   renderPromptList();
   updateStatusByKey("status.promptDeleteDone", "success");
 };
@@ -636,6 +710,19 @@ const refreshPromptLocalization = () => {
     const add = modal.querySelector('[data-prompt-action="add"]');
     if (add instanceof HTMLButtonElement) {
       add.textContent = t("prompt.add");
+      add.className = "chatgpt-toolkit-prompt-add";
+    }
+
+    const update = modal.querySelector('[data-prompt-action="update"]');
+    if (update instanceof HTMLButtonElement) {
+      update.textContent = t("prompt.update");
+      update.style.display = promptState.editingId ? "block" : "none";
+    }
+
+    const cancel = modal.querySelector('[data-prompt-action="cancel"]');
+    if (cancel instanceof HTMLButtonElement) {
+      cancel.textContent = t("prompt.cancel");
+      cancel.style.display = promptState.editingId ? "block" : "none";
     }
 
     const importButton = modal.querySelector('[data-prompt-action="import"]');
@@ -712,7 +799,7 @@ const handlePromptModalClick = async (event) => {
       return;
     }
     if (action === "add") {
-      await addPromptFromModal();
+      await addPromptFromModal(false);
       return;
     }
     if (action === "export") {
@@ -734,6 +821,21 @@ const handlePromptModalClick = async (event) => {
       }
       return;
     }
+    if (action === "copy") {
+      const promptId = actionTarget.dataset.promptId;
+      if (promptId) {
+        await copyPromptById(promptId);
+      }
+      return;
+    }
+    if (action === "update") {
+      await addPromptFromModal(true);
+      return;
+    }
+    if (action === "cancel") {
+      cancelEditingPrompt();
+      return;
+    }
   }
 
   const promptNode =
@@ -749,7 +851,7 @@ const handlePromptModalClick = async (event) => {
 
   const promptId = promptNode.dataset.promptId;
   if (promptId) {
-    await copyPromptById(promptId);
+    startEditingPrompt(promptId);
   }
 };
 
@@ -793,7 +895,11 @@ const ensurePromptModal = () => {
         <input id="chatgpt-toolkit-prompt-add-title" type="text" placeholder="${t("prompt.titlePlaceholder")}" />
         <input id="chatgpt-toolkit-prompt-add-category" type="text" placeholder="${t("prompt.categoryPlaceholder")}" />
         <textarea id="chatgpt-toolkit-prompt-add-content" rows="4" placeholder="${t("prompt.contentPlaceholder")}"></textarea>
-        <button type="button" class="chatgpt-toolkit-prompt-add" data-prompt-action="add">${t("prompt.add")}</button>
+        <div class="chatgpt-toolkit-prompt-editor-actions">
+          <button type="button" class="chatgpt-toolkit-prompt-cancel" data-prompt-action="cancel" style="display: none;">${t("prompt.cancel")}</button>
+          <button type="button" class="chatgpt-toolkit-prompt-update" data-prompt-action="update" style="display: none;">${t("prompt.update")}</button>
+          <button type="button" class="chatgpt-toolkit-prompt-add" data-prompt-action="add">${t("prompt.add")}</button>
+        </div>
       </div>
       <div class="chatgpt-toolkit-prompt-footer">
         <span id="chatgpt-toolkit-prompt-count">${t("prompt.count", { visible: 0, total: 0 })}</span>
