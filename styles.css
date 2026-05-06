@@ -544,11 +544,11 @@
 #chatgpt-conversation-toolkit .chatgpt-toolkit-shortcut-filters select {
   width: 100%;
   min-height: 28px;
-  border: 1px solid rgba(71, 85, 105, 0.72);
+  border: 1px solid var(--toolkit-button-border);
   border-radius: 8px;
   padding: 0 10px;
-  background: rgba(15, 23, 42, 0.04);
-  color: #e2e8f0;
+  background: var(--toolkit-button-bg);
+  color: var(--toolkit-text);
   font-size: 12px;
   outline: none;
 }
@@ -575,9 +575,9 @@
   text-align: left;
   padding: 8px 10px;
   border-radius: 8px;
-  border: 1px solid rgba(71, 85, 105, 0.4);
-  background: rgba(15, 23, 42, 0.04);
-  color: #e2e8f0;
+  border: 1px solid var(--toolkit-button-border);
+  background: var(--toolkit-button-bg);
+  color: var(--toolkit-text);
   font-size: 12px;
   cursor: pointer;
   white-space: nowrap;
@@ -586,12 +586,12 @@
   transition: background-color var(--toolkit-transition-fast), border-color var(--toolkit-transition-fast);
 }
 #chatgpt-conversation-toolkit .chatgpt-toolkit-prompt-shortcut-item:hover {
-  background: rgba(15, 23, 42, 0.12);
+  background: var(--toolkit-button-hover);
   border-color: rgba(16, 163, 127, 0.32);
 }
 #chatgpt-conversation-toolkit .chatgpt-toolkit-prompt-shortcut-empty {
   font-size: 12px;
-  color: #94a3b8;
+  color: var(--toolkit-muted);
   text-align: center;
   padding: 12px 0;
   margin: 0;

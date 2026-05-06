@@ -382,7 +382,7 @@ const buildToolbar = () => {
       </div>
     </div>
     <div class="chatgpt-toolkit-prompt-shortcuts">
-      <button type="button" class="chatgpt-toolkit-button" data-action="prompt-library">
+      <button type="button" class="chatgpt-toolkit-button primary" data-action="prompt-library">
         ${t("toolbar.promptLibrary")}
       </button>
       <div class="chatgpt-toolkit-shortcut-filters">

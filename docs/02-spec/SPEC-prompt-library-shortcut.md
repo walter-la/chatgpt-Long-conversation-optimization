@@ -30,6 +30,14 @@ This specification defines the behavior and UI requirements for adding a collaps
   2. Prompt Shortcut Area (Prompt Library Button, Category selector, Title list)
 - **Verification**: Visual inspection of hidden/visible elements.
 
+<!-- { "id": "TK-UI-004", "level": "MUST", "owner": "frontend", "status": "draft" } -->
+### TK-UI-004: Visual Consistency
+- **Statement**: Elements in the shortcut area MUST follow the toolkit's design system:
+  1. The **Prompt Library button** MUST use the "Primary" button style (Green background, similar to "Export JSON").
+  2. **Prompt Shortcut items** MUST use the "Secondary" button style (Bordered, adapting to Light/Dark theme, similar to "Settings" button).
+  3. All text MUST be clearly legible in both Light and Dark modes.
+- **Verification**: Visual inspection in both Light and Dark modes.
+
 ## 3. Prompt Shortcut Area Behavior
 
 <!-- { "id": "TK-PL-001", "level": "MUST", "owner": "logic", "status": "draft" } -->
