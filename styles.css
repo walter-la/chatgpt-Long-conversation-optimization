@@ -578,10 +578,11 @@
   outline: none;
 }
 #chatgpt-conversation-toolkit .chatgpt-toolkit-prompt-shortcut-list {
-  max-height: 220px;
+  max-height: 60vh;
   overflow-y: auto;
   display: flex;
   flex-direction: column;
+  flex-shrink: 0;
   gap: 4px;
   padding-right: 4px;
 }
@@ -597,6 +598,7 @@
 }
 #chatgpt-conversation-toolkit .chatgpt-toolkit-prompt-shortcut-item {
   width: 100%;
+  flex-shrink: 0;
   text-align: left;
   padding: 8px 10px;
   border-radius: 8px;

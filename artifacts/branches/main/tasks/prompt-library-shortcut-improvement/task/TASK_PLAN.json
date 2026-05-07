@@ -43,15 +43,15 @@
       "task_id": "impl-ui-toolbar",
       "skill_ref": "s05-implementation",
       "title": "TK-UI-001/002/003: Collapsible Toolbar UI",
-      "status": "pending",
+      "status": "completed",
       "priority": "High",
       "depends_on": ["impl-state-persistence", "impl-i18n"]
     },
     {
       "task_id": "impl-ui-shortcut",
       "skill_ref": "s05-implementation",
-      "title": "TK-PL-001/002/003/004/005/006: Prompt Shortcut Area Logic",
-      "status": "pending",
+      "title": "TK-PL-001/002/003/004/005/006: Prompt Shortcut Area Logic & Dynamic Height",
+      "status": "completed",
       "priority": "High",
       "depends_on": ["impl-ui-toolbar", "impl-category-persistence"]
     },

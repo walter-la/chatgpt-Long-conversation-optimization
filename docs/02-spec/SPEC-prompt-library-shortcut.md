@@ -61,9 +61,9 @@ This specification defines the behavior and UI requirements for adding a collaps
 - **Verification**: Click title -> verify clipboard content matches prompt content; verify input box is unchanged.
 
 <!-- { "id": "TK-PL-005", "level": "MUST", "owner": "frontend", "status": "draft" } -->
-### TK-PL-005: Scrollable List
-- **Statement**: The prompt title list MUST have a `max-height` (e.g., 220px) and a vertical scrollbar if the content exceeds this height.
-- **Verification**: Add >20 prompts -> verify scrollbar appears and panel height remains stable.
+### TK-PL-005: Scrollable List & Dynamic Height
+- **Statement**: The prompt title list MUST grow dynamically to fit its content up to a maximum height (e.g., 60% of viewport height). It MUST provide a vertical scrollbar if the content exceeds this height. Shortcut items MUST NOT be squashed or compressed; they MUST maintain their intended height.
+- **Verification**: Add many prompts -> verify the panel height increases to accommodate them; verify items maintain their normal height and a scrollbar appears when the maximum height is reached.
 
 <!-- { "id": "TK-PL-006", "level": "MUST", "owner": "logic", "status": "draft" } -->
 ### TK-PL-006: Sync on Modal Close
