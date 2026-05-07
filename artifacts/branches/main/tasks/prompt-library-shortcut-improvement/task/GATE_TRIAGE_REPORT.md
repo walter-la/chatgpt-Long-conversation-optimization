@@ -30,6 +30,7 @@
 ### State Persistence (TK-ST-1 to TK-ST-2)
 - **PASS**: `isMenuCollapsed` correctly persisted in `localStorage` via `saveToolMenuCollapsedState()`.
 - **PASS**: `promptSortPreference` persisted via `savePromptSortPreference()` and restored correctly on session reload.
+- **PASS**: `promptCategoryPreference` (TK-ST-003) persisted and restored correctly. Initialization logic includes a load-guard to ensure selection is applied before first filter.
 
 ## 3. Taxonomy & Auto-Fixes
 - None triggered. First pass verification successful.

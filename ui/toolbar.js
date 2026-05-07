@@ -468,6 +468,7 @@ const buildToolbar = () => {
     }
     if (target instanceof HTMLSelectElement && target.id === "chatgpt-toolkit-shortcut-category-filter") {
       promptState.category = target.value;
+      savePromptCategoryPreference(target.value);
       applyPromptFilters();
       renderPromptShortcutList();
     }

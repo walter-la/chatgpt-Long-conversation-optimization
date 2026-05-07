@@ -193,6 +193,7 @@ const ensurePromptLibraryLoaded = async () => {
 
   promptState.loaded = true;
   promptState.sortBy = loadPromptSortPreference();
+  promptState.category = loadPromptCategoryPreference();
   applyPromptFilters();
 };
 
@@ -959,6 +960,9 @@ const ensurePromptModal = () => {
   if (elements?.categorySelect instanceof HTMLSelectElement) {
     elements.categorySelect.addEventListener("change", () => {
       promptState.category = elements.categorySelect.value || "all";
+      if (typeof savePromptCategoryPreference === "function") {
+        savePromptCategoryPreference(promptState.category);
+      }
       applyPromptFilters();
       renderPromptList();
       if (typeof renderPromptShortcutList === "function" && document.getElementById("chatgpt-toolkit-shortcut-list")) {

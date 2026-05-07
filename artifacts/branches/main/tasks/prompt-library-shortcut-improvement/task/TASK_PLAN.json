@@ -32,6 +32,14 @@
       "depends_on": ["spec-authoring"]
     },
     {
+      "task_id": "impl-category-persistence",
+      "skill_ref": "s05-implementation",
+      "title": "TK-ST-003: Category Persistence",
+      "status": "completed",
+      "priority": "High",
+      "depends_on": ["spec-authoring"]
+    },
+    {
       "task_id": "impl-ui-toolbar",
       "skill_ref": "s05-implementation",
       "title": "TK-UI-001/002/003: Collapsible Toolbar UI",
@@ -45,7 +53,7 @@
       "title": "TK-PL-001/002/003/004/005/006: Prompt Shortcut Area Logic",
       "status": "pending",
       "priority": "High",
-      "depends_on": ["impl-ui-toolbar"]
+      "depends_on": ["impl-ui-toolbar", "impl-category-persistence"]
     },
     {
       "task_id": "quality-gate",

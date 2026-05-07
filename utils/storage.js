@@ -94,6 +94,23 @@ const loadPromptSortPreference = (defaultSort = "updated-desc") => {
   }
 };
 
+const savePromptCategoryPreference = (category) => {
+  try {
+    localStorage.setItem(PROMPT_CATEGORY_PREFERENCE_KEY, category);
+  } catch (error) {
+    // Ignore storage write failures.
+  }
+};
+
+const loadPromptCategoryPreference = (defaultCategory = "all") => {
+  try {
+    const stored = localStorage.getItem(PROMPT_CATEGORY_PREFERENCE_KEY);
+    return stored || defaultCategory;
+  } catch (error) {
+    return defaultCategory;
+  }
+};
+
 const loadTimelinePosition = () => {
   try {
     const stored = localStorage.getItem(TIMELINE_POSITION_KEY);

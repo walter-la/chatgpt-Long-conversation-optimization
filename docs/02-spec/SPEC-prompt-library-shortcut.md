@@ -52,8 +52,8 @@ This specification defines the behavior and UI requirements for adding a collaps
 
 <!-- { "id": "TK-PL-003", "level": "MUST", "owner": "logic", "status": "draft" } -->
 ### TK-PL-003: Prompt Filtering
-- **Statement**: Selecting a category MUST filter the prompt title list to only show prompts belonging to that category.
-- **Verification**: Select category -> verify only matching prompts are listed.
+- **Statement**: Selecting a category MUST filter the prompt title list to only show prompts belonging to that category. The first filtering operation after page load MUST wait until the persisted category selection (if any) is fully loaded to prevent UI flickering or incorrect initial state.
+- **Verification**: Select category -> verify only matching prompts are listed. Reload page -> verify the list is correctly filtered according to stored state without intermediate "All" state.
 
 <!-- { "id": "TK-PL-004", "level": "MUST", "owner": "logic", "status": "draft" } -->
 ### TK-PL-004: Copy on Click
@@ -81,6 +81,11 @@ This specification defines the behavior and UI requirements for adding a collaps
 ### TK-ST-002: Persistence of Sort Preference
 - **Statement**: The sort preference selected in the full Prompt Library MUST be persisted and applied to the shortcut list.
 - **Verification**: Change sort to "Title A-Z" in popup -> Verify shortcut list follows the same order after refresh.
+
+<!-- { "id": "TK-ST-003", "level": "MUST", "owner": "storage", "status": "draft" } -->
+### TK-ST-003: Persistence of Category Selection
+- **Statement**: The last selected Category in the shortcut area MUST be persisted. Upon next load, this category MUST be automatically selected and used for filtering.
+- **Verification**: Select a category -> Refresh page -> Verify the category and filtered list are restored.
 
 ## 5. Internationalization (i18n)
 

@@ -1,0 +1,20 @@
+{
+  "affected_documents": [
+    {
+      "path": "docs/02-spec/SPEC-prompt-library-shortcut.md",
+      "doc_role": "specification",
+      "status": "draft",
+      "authoritative": true,
+      "line_count": 115,
+      "clauses_affected": ["TK-PL-003", "TK-ST-003 (New)"],
+      "write_recommendation": "amend"
+    }
+  ],
+  "conflicts": [],
+  "consistency_audit": {
+    "semantic_drift": "None. Adding persistence to existing category selection feature.",
+    "coverage_gap": "TK-PL-003 needs updated verification to ensure load sequence.",
+    "terminology": "Consistent with 'Category' and 'Persistence' terms."
+  },
+  "governance_review_queue": []
+}
