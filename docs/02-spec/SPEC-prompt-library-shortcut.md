@@ -70,6 +70,14 @@ This specification defines the behavior and UI requirements for adding a collaps
 - **Statement**: When the full Prompt Library modal is closed, the Prompt Shortcut Area MUST refresh its title list to ensure synchronization with any changes made during the library session.
 - **Verification**: Open library -> Add a prompt -> Close library -> Verify the new prompt appears in the shortcut area list.
 
+<!-- { "id": "TK-PL-007", "level": "MUST", "owner": "frontend", "status": "draft" } -->
+### TK-PL-007: Toast Notification Feedback
+- **Statement**: Clicking a prompt shortcut MUST trigger a Toast notification (e.g., "Copied: [Title]") that:
+  1. Appears automatically.
+  2. Disappears after a few seconds (e.g., 3s).
+  3. DOES NOT occupy layout space in the shortcut area (floats over other elements).
+- **Verification**: Click a prompt -> verify notification appears floating at the bottom, does not shift other buttons, and disappears after 3s.
+
 ## 4. State Persistence
 
 <!-- { "id": "TK-ST-001", "level": "MUST", "owner": "storage", "status": "draft" } -->

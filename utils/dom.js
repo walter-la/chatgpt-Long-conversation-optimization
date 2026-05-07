@@ -52,6 +52,7 @@ const MESSAGE_CONTENT_SELECTOR = [
 const MESSAGE_CACHE_LIMIT = 1500;
 const MESSAGE_STORE_REFRESH_MIN_INTERVAL_MS = 90;
 const COLLAPSED_MESSAGE_ATTR = "data-chatgpt-toolkit-collapsed-message";
+let statusToastTimer = null;
 
 const getConversationMain = () =>
   document.querySelector("#thread") ||
@@ -800,6 +801,21 @@ const updateStatusByKey = (key, tone = "info", params = {}) => {
   status.dataset.i18nParams = JSON.stringify(params);
   status.textContent = t(key, params);
   status.dataset.tone = tone;
+
+  if (statusToastTimer) {
+    clearTimeout(statusToastTimer);
+    statusToastTimer = null;
+  }
+
+  if (tone === "success") {
+    statusToastTimer = setTimeout(() => {
+      status.dataset.tone = "info";
+      status.textContent = t("toolbar.ready");
+      delete status.dataset.i18nKey;
+      delete status.dataset.i18nParams;
+      statusToastTimer = null;
+    }, 3000);
+  }
 };
 
 const refreshStatusLocalization = () => {
