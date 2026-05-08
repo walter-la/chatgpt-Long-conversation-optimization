@@ -1640,17 +1640,19 @@ const updateTimelineCount = (currentNodeOrder, totalCount) => {
 };
 
 const updateTimelineToggleButton = () => {
-  const button = document.querySelector(`#${TOOLKIT_ID} [data-action="timeline-toggle"]`);
-  if (!(button instanceof HTMLButtonElement)) {
-    return;
-  }
-  if (timelineState.visible) {
-    button.textContent = t("toolbar.timelineHide");
-    button.setAttribute("aria-label", t("toolbar.timelineHide"));
-  } else {
-    button.textContent = t("toolbar.timelineShow");
-    button.setAttribute("aria-label", t("toolbar.timelineShow"));
-  }
+  const buttons = document.querySelectorAll(`#${TOOLKIT_ID} [data-action="timeline-toggle"]`);
+  buttons.forEach((button) => {
+    if (!(button instanceof HTMLButtonElement)) {
+      return;
+    }
+    if (timelineState.visible) {
+      button.textContent = t("toolbar.timelineHide");
+      button.setAttribute("aria-label", t("toolbar.timelineHide"));
+    } else {
+      button.textContent = t("toolbar.timelineShow");
+      button.setAttribute("aria-label", t("toolbar.timelineShow"));
+    }
+  });
 };
 
 const refreshTimelineLocalization = () => {

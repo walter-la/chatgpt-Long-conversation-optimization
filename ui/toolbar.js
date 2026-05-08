@@ -382,6 +382,9 @@ const buildToolbar = () => {
       </div>
     </div>
     <div class="chatgpt-toolkit-prompt-shortcuts">
+      <button type="button" class="chatgpt-toolkit-button" data-action="timeline-toggle">
+        ${timelineState.visible ? t("toolbar.timelineHide") : t("toolbar.timelineShow")}
+      </button>
       <button type="button" class="chatgpt-toolkit-button primary" data-action="prompt-library">
         ${t("toolbar.promptLibrary")}
       </button>

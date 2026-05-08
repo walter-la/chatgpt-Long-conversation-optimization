@@ -28,7 +28,13 @@ This specification defines the behavior and UI requirements for adding a collaps
 - **Statement**: In the "Collapsed" state, the panel MUST hide most main features (actions, search) AND extraneous UI elements (subtitle, status text, tips, CTA rows), and ONLY display:
   1. Panel Header (Title + Toggle Button, excluding subtitle)
   2. Prompt Shortcut Area (Prompt Library Button, Category selector, Title list)
+  3. Timeline Toggle Button (Show/Hide Timeline)
 - **Verification**: Visual inspection of hidden/visible elements.
+
+<!-- { "id": "TK-UI-005", "level": "MUST", "owner": "frontend", "status": "draft" } -->
+### TK-UI-005: Timeline Toggle in Shortcut Area
+- **Statement**: The shortcut area MUST include a "Show/Hide Timeline" button. It MUST be placed above the prompt list and use the "Secondary" button style.
+- **Verification**: Visual inspection in collapsed state; click button and verify timeline appears/disappears and button text updates.
 
 <!-- { "id": "TK-UI-004", "level": "MUST", "owner": "frontend", "status": "draft" } -->
 ### TK-UI-004: Visual Consistency

@@ -88,7 +88,9 @@
   display: none;
 }
 #chatgpt-conversation-toolkit.is-menu-collapsed .chatgpt-toolkit-prompt-shortcuts {
-  display: block;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
 }
 #chatgpt-conversation-toolkit.is-menu-collapsed .chatgpt-toolkit-status {
   position: absolute;

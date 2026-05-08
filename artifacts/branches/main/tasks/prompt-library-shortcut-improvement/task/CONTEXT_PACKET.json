@@ -20,7 +20,8 @@
     "Persistence of collapse state, sort preference, and category selection",
     "Filtering must wait for persisted category to be loaded",
     "Maintain existing UI behavior when expanded",
-    "Prompt shortcut list must have dynamic height (up to 60vh) and items must not squash"
+    "Prompt shortcut list must have dynamic height (up to 60vh) and items must not squash",
+    "Add 'Show/Hide Timeline' button in the shortcut area (collapsed state)"
   ],
   "unknowns": {
     "decision_blockers": [],

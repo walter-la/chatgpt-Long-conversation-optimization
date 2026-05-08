@@ -56,6 +56,14 @@
       "depends_on": ["impl-ui-toolbar", "impl-category-persistence"]
     },
     {
+      "task_id": "impl-timeline-toggle-shortcut",
+      "skill_ref": "s05-implementation",
+      "title": "TK-UI-005: Timeline Toggle in Shortcut Area",
+      "status": "completed",
+      "priority": "Med",
+      "depends_on": ["impl-ui-shortcut"]
+    },
+    {
       "task_id": "quality-gate",
       "skill_ref": "s06-quality-gate-triage",
       "title": "Quality Gate Verification",
