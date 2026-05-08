@@ -26,6 +26,7 @@ const getTimelineElements = () => {
     content: timeline.querySelector(`.${TIMELINE_CONTENT_CLASS}`),
     preview: timeline.querySelector(`#${TIMELINE_PREVIEW_ID}`),
     hint: timeline.querySelector(`#${TIMELINE_HINT_ID}`),
+    close: timeline.querySelector(`#${TIMELINE_CLOSE_ID}`),
   };
 };
 
@@ -1441,6 +1442,12 @@ const handleTimelineWheel = (event) => {
 
 const handleTimelineClick = (event) => {
   const target = event.target;
+  const closeButton = target instanceof Element ? target.closest(`#${TIMELINE_CLOSE_ID}`) : null;
+  if (closeButton) {
+    setTimelineVisibility(false);
+    return;
+  }
+
   const nodeButton =
     target instanceof Element
       ? target.closest("[data-timeline-index]")
@@ -1660,6 +1667,12 @@ const refreshTimelineLocalization = () => {
     title.textContent = t("timeline.title");
   }
 
+  const close = timeline.querySelector(`#${TIMELINE_CLOSE_ID}`);
+  if (close instanceof HTMLElement) {
+    close.title = t("timeline.close");
+    close.setAttribute("aria-label", t("timeline.close"));
+  }
+
   updateTimelineToggleButton();
 
   const currentItem = timelineState.items[timelineState.activeIndex];
@@ -1740,6 +1753,15 @@ const ensureTimeline = () => {
         count.className = "chatgpt-toolkit-timeline-count";
         count.textContent = "0/0";
         header.appendChild(count);
+
+        const close = document.createElement("button");
+        close.id = TIMELINE_CLOSE_ID;
+        close.className = "chatgpt-toolkit-timeline-close";
+        close.type = "button";
+        close.title = t("timeline.close");
+        close.setAttribute("aria-label", t("timeline.close"));
+        close.textContent = "×";
+        header.prepend(close);
       }
     }
     existingTimeline.setAttribute("aria-label", t("timeline.ariaLabel"));
@@ -1764,6 +1786,7 @@ const ensureTimeline = () => {
   timeline.innerHTML = `
     <div class="chatgpt-toolkit-timeline-panel">
       <div class="chatgpt-toolkit-timeline-header">
+        <button id="${TIMELINE_CLOSE_ID}" class="chatgpt-toolkit-timeline-close" type="button" title="${t("timeline.close")}" aria-label="${t("timeline.close")}">×</button>
         <span class="chatgpt-toolkit-timeline-title">${t("timeline.title")}</span>
         <span id="${TIMELINE_COUNT_ID}" class="chatgpt-toolkit-timeline-count">0/0</span>
       </div>

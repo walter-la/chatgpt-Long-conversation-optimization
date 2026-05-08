@@ -1,0 +1,25 @@
+{
+  "version": "4.11",
+  "task_id": "timeline-close-button",
+  "plan_status": "in_progress",
+  "active_stage": "stage-1-spec",
+  "delivery_strategy": "standard",
+  "governance_tier": "Lite",
+  "stages": [
+    {
+      "id": "stage-1-spec",
+      "title": "Spec & Clause Authoring",
+      "status": "in_progress"
+    },
+    {
+      "id": "stage-2-impl",
+      "title": "Implementation",
+      "status": "pending"
+    },
+    {
+      "id": "stage-3-gate",
+      "title": "Quality Gate",
+      "status": "pending"
+    }
+  ]
+}

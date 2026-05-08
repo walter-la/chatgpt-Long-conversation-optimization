@@ -92,6 +92,7 @@ const I18N_MESSAGES = {
     "timeline.countAria": "Current node {current}, total user messages {total}",
     "timeline.jumpAria": "Jump to user message {index}",
     "timeline.previewFallback": "User message {index}",
+    "timeline.close": "Close",
 
     "prompt.untitled": "Untitled Prompt",
     "prompt.uncategorized": "Uncategorized",
@@ -235,6 +236,7 @@ const I18N_MESSAGES = {
     "timeline.countAria": "当前节点 {current}，总用户节点 {total}",
     "timeline.jumpAria": "跳转到第 {index} 条用户消息",
     "timeline.previewFallback": "用户消息 {index}",
+    "timeline.close": "关闭",
 
     "prompt.untitled": "未命名指令",
     "prompt.uncategorized": "未分类",

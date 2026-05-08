@@ -1,0 +1,38 @@
+{
+  "version": "4.11",
+  "task_id": "timeline-close-button",
+  "tasks": [
+    {
+      "task_id": "T1-create-spec",
+      "skill_ref": "s02-spec-clause-authoring",
+      "title": "Create Timeline SPEC and add close button clause",
+      "status": "in_progress",
+      "priority": "High",
+      "depends_on": []
+    },
+    {
+      "task_id": "T2-impl-close-button",
+      "skill_ref": "s05-implementation",
+      "title": "Implement close button in features/timeline.js",
+      "status": "pending",
+      "priority": "Med",
+      "depends_on": ["T1-create-spec"]
+    },
+    {
+      "task_id": "T3-style-close-button",
+      "skill_ref": "s05-implementation",
+      "title": "Add styles for close button in styles.css",
+      "status": "pending",
+      "priority": "Med",
+      "depends_on": ["T2-impl-close-button"]
+    },
+    {
+      "task_id": "T4-verify-feature",
+      "skill_ref": "s06-quality-gate-triage",
+      "title": "Verify timeline close button functionality",
+      "status": "pending",
+      "priority": "Med",
+      "depends_on": ["T3-style-close-button"]
+    }
+  ]
+}

@@ -1,0 +1,31 @@
+{
+  "version": "4.11",
+  "task_id": "timeline-close-button",
+  "affected_documents": [
+    {
+      "path": "features/timeline.js",
+      "doc_role": "reference",
+      "status": "legacy",
+      "authoritative": true,
+      "clauses_affected": []
+    },
+    {
+      "path": "styles.css",
+      "doc_role": "reference",
+      "status": "legacy",
+      "authoritative": true,
+      "clauses_affected": []
+    }
+  ],
+  "tooling": {
+    "language": "javascript",
+    "styling": "css"
+  },
+  "write_recommendation": {
+    "type": "amend",
+    "target": "docs/02-spec/SPEC-timeline.md",
+    "rationale": "Updating the SPEC to reflect the precise positioning requirement for the close button."
+  },
+  "conflicts": [],
+  "governance_review_queue": []
+}

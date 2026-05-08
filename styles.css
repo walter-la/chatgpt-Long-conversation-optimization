@@ -804,6 +804,30 @@
   touch-action: none;
 }
 
+.chatgpt-toolkit-timeline-close {
+  position: relative;
+  width: 24px;
+  height: 24px;
+  margin-bottom: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: transparent;
+  border: none;
+  color: #64748b;
+  font-size: 18px;
+  line-height: 1;
+  cursor: pointer;
+  transition: color var(--toolkit-transition-fast), background-color var(--toolkit-transition-fast);
+  border-radius: 6px;
+  z-index: 10;
+}
+
+.chatgpt-toolkit-timeline-close:hover {
+  background: rgba(248, 250, 252, 0.1);
+  color: #f8fafc;
+}
+
 .chatgpt-toolkit-timeline.is-dragging .chatgpt-toolkit-timeline-header {
   cursor: grabbing;
 }

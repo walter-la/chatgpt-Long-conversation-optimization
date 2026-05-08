@@ -30,6 +30,7 @@ const TIMELINE_TRACK_ID = "chatgpt-conversation-toolkit-timeline-track";
 const TIMELINE_COUNT_ID = "chatgpt-conversation-toolkit-timeline-count";
 const TIMELINE_PREVIEW_ID = "chatgpt-conversation-toolkit-timeline-preview";
 const TIMELINE_HINT_ID = "chatgpt-conversation-toolkit-timeline-hint";
+const TIMELINE_CLOSE_ID = "chatgpt-conversation-toolkit-timeline-close";
 const LATEX_COPY_ID = "chatgpt-toolkit-latex-copy";
 let TIMELINE_VISIBLE_NODE_CAPACITY = 10;
 let TIMELINE_MAX_NODES = 20;

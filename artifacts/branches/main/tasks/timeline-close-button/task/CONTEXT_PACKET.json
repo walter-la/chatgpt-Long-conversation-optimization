@@ -1,0 +1,30 @@
+{
+  "version": "4.11",
+  "task_id": "timeline-close-button",
+  "request": "在 Timeline Panel 的最上方，增加一個 X 的 close button ，方便可以隱藏 Timeline Panel ，效果就跟在主功能表上點擊 Hide Timeline 的效果一樣",
+  "extracted": {
+    "target_scope": [
+      "features/timeline.js",
+      "styles.css"
+    ],
+    "change_type": "add_requirement",
+    "risk_level": "Low",
+    "constraints": [
+      "Add 'X' close button at the top of Timeline Panel",
+      "Functionality: Hide Timeline Panel on click",
+      "Consistency: Match the behavior of 'Hide Timeline' from the toolbar",
+      "UI: Close button must be at the very top, before 'TIMELINE' text, without overlap."
+    ]
+  },
+  "baseline": {
+    "branch": "main",
+    "current_behavior": "Timeline Panel is toggled only via the toolbar. It currently lacks an internal close button."
+  },
+  "tooling": {
+    "language": "javascript",
+    "styling": "css"
+  },
+  "derived": {
+    "governance_tier": "Lite"
+  }
+}
